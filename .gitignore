@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# JavaScript dependencies
+node_modules/
+
+# Local development data and configuration
+*.sqlite3
+.vscode/
