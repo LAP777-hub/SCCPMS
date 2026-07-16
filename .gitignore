@@ -7,6 +7,5 @@ venv/
 # JavaScript dependencies
 node_modules/
 
-# Local development data and configuration
+# Local development data
 *.sqlite3
-.vscode/
