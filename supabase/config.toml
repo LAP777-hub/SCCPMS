@@ -1,0 +1,5 @@
+[functions.otp-verify]
+verify_jwt = true
+
+[functions.admin-register-staff]
+verify_jwt = true

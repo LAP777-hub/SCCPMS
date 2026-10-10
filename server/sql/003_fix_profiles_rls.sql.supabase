@@ -1,0 +1,27 @@
+-- Fix profiles table RLS policies
+-- NOTE: This migration is for Supabase profiles table, not local PostgreSQL
+-- Run this in Supabase SQL Editor, not via migration script
+
+-- Drop user-writable policies to prevent privilege escalation
+-- The server writes profiles using the service role, so clients should not have write access
+
+-- Drop existing policies if they exist
+-- DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
+-- DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
+-- DROP POLICY IF EXISTS "Users can insert their own profile" ON profiles;
+
+-- Create read-only policy for users
+-- CREATE POLICY "Users can view their own profile" ON profiles
+--   FOR SELECT
+--   USING (auth.uid() = id);
+
+-- No write policies for users - server uses service role for all writes
+
+-- Grant service role full access (used by backend)
+-- GRANT ALL ON profiles TO service_role;
+
+-- Grant anon role read access only (for public user lookup if needed)
+-- GRANT SELECT ON profiles TO anon;
+
+-- Grant authenticated role read access only
+-- GRANT SELECT ON profiles TO authenticated;

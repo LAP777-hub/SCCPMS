@@ -1,0 +1,17 @@
+# Environment files with secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Node modules
+node_modules
+
+# Build output
+dist
+
+# Logs
+*.log
+
+# OS
+.DS_Store

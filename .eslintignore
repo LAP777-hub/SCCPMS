@@ -1,0 +1,13 @@
+# Dependencies
+node_modules
+dist
+build
+
+# Scripts
+scripts
+
+# Server tests
+server/tests
+
+# Documentation
+*.md

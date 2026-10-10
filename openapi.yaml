@@ -1,0 +1,2383 @@
+openapi: 3.0.3
+info:
+  title: SCCPMS API
+  description: Smart Campus Clinic Patient Management System API
+  version: 1.0.0
+  contact:
+    name: SCCPMS Support
+    email: support@sccpms.edu
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:4000
+    description: Development server
+  - url: https://api.your-domain.com
+    description: Production server
+
+tags:
+  - name: Health
+    description: Health check and monitoring endpoints
+  - name: Authentication
+    description: OTP verification endpoints
+  - name: Profile
+    description: User profile management
+  - name: Patients
+    description: Patient management (admin/receptionist)
+  - name: Doctors
+    description: Doctor management
+  - name: Appointments
+    description: Appointment scheduling and management
+  - name: Scheduling
+    description: Availability and clinic settings
+  - name: Clinical
+    description: Clinical workflows (visits, prescriptions, labs)
+  - name: Walk-ins
+    description: Walk-in patient management
+  - name: Leave
+    description: Doctor leave requests
+  - name: Notifications
+    description: User notifications
+  - name: Audit
+    description: Audit logging (admin)
+  - name: Reports
+    description: Operational reports (admin)
+
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Health check endpoint
+      description: Basic health check for monitoring
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+
+  /metrics:
+    get:
+      tags: [Health]
+      summary: Detailed metrics endpoint
+      description: Detailed system health and performance metrics
+      operationId: metrics
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+
+  /auth/otp/send:
+    post:
+      tags: [Authentication]
+      summary: Send OTP verification code
+      description: Send OTP code to user's phone for two-factor authentication
+      operationId: sendOtp
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/otp/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify OTP code
+      description: Verify the OTP code sent to the user's phone
+      operationId: verifyOtp
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid OTP code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/profile:
+    get:
+      tags: [Profile]
+      summary: Get user profile
+      description: Retrieve current user's profile information
+      operationId: getProfile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Profile]
+      summary: Update user profile
+      description: Update current user's profile information
+      operationId: updateProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/patients:
+    get:
+      tags: [Patients]
+      summary: List all patients
+      description: Retrieve list of all patients (admin/receptionist only)
+      operationId: listPatients
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Patients retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Patients]
+      summary: Register new patient
+      description: Register a new patient account (admin/receptionist only)
+      operationId: createPatient
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientCreateRequest'
+      responses:
+        '201':
+          description: Patient created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/doctors:
+    get:
+      tags: [Doctors]
+      summary: List all doctors
+      description: Retrieve list of all active doctors
+      operationId: listDoctors
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Doctors retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Doctors]
+      summary: Add new doctor
+      description: Add a new doctor to the directory (admin only)
+      operationId: createDoctor
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoctorCreateRequest'
+      responses:
+        '201':
+          description: Doctor created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/staff:
+    post:
+      tags: [Doctors]
+      summary: Invite new staff member
+      description: Invite a new staff member (doctor or receptionist) - admin only
+      operationId: createStaff
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StaffCreateRequest'
+      responses:
+        '201':
+          description: Staff invitation sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/appointments:
+    get:
+      tags: [Appointments]
+      summary: List appointments
+      description: Retrieve appointments (filtered by user role)
+      operationId: listAppointments
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Appointments retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Appointments]
+      summary: Book new appointment
+      description: Book a new appointment (patients only)
+      operationId: createAppointment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentCreateRequest'
+      responses:
+        '201':
+          description: Appointment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Time slot no longer available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/appointments/{id}/status:
+    patch:
+      tags: [Appointments]
+      summary: Update appointment status
+      description: Update appointment status (role-based transitions)
+      operationId: updateAppointmentStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Appointment ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentStatusUpdateRequest'
+      responses:
+        '200':
+          description: Appointment status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Appointment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/doctors/{id}/availability:
+    get:
+      tags: [Scheduling]
+      summary: Get doctor availability
+      description: Retrieve available time slots for a specific doctor
+      operationId: getDoctorAvailability
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Doctor ID
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+            example: "2024-01-01"
+          description: Date in YYYY-MM-DD format
+      responses:
+        '200':
+          description: Availability retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/availability-slots:
+    post:
+      tags: [Scheduling]
+      summary: Add availability slot
+      description: Add a new availability slot (admin/receptionist/doctor)
+      operationId: createAvailabilitySlot
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AvailabilitySlotCreateRequest'
+      responses:
+        '201':
+          description: Availability slot created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilitySlotResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Overlapping slot exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/clinic/settings:
+    get:
+      tags: [Scheduling]
+      summary: Get clinic settings
+      description: Retrieve clinic configuration settings
+      operationId: getClinicSettings
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClinicSettingsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags: [Scheduling]
+      summary: Update clinic settings
+      description: Update clinic configuration settings (admin only)
+      operationId: updateClinicSettings
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClinicSettingsUpdateRequest'
+      responses:
+        '200':
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClinicSettingsResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/appointments/{id}/reschedule:
+    post:
+      tags: [Scheduling]
+      summary: Reschedule appointment
+      description: Reschedule an existing appointment
+      operationId: rescheduleAppointment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Appointment ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentRescheduleRequest'
+      responses:
+        '200':
+          description: Appointment rescheduled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Requested time slot no longer available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/patient-visits:
+    get:
+      tags: [Clinical]
+      summary: List patient visits
+      description: Retrieve clinical visits (filtered by user role)
+      operationId: listPatientVisits
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Visits retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientVisitsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Clinical]
+      summary: Record clinical visit
+      description: Record a new clinical visit (doctor only)
+      operationId: createPatientVisit
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientVisitCreateRequest'
+      responses:
+        '201':
+          description: Visit recorded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientVisitResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/prescriptions:
+    get:
+      tags: [Clinical]
+      summary: List prescriptions
+      description: Retrieve prescriptions (filtered by user role)
+      operationId: listPrescriptions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Prescriptions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrescriptionsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Clinical]
+      summary: Add prescription
+      description: Add a new prescription (doctor only)
+      operationId: createPrescription
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrescriptionCreateRequest'
+      responses:
+        '201':
+          description: Prescription created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrescriptionResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/lab-orders:
+    get:
+      tags: [Clinical]
+      summary: List lab orders
+      description: Retrieve laboratory orders (filtered by user role)
+      operationId: listLabOrders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lab orders retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabOrdersResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Clinical]
+      summary: Order lab test
+      description: Order a new laboratory test (doctor only)
+      operationId: createLabOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabOrderCreateRequest'
+      responses:
+        '201':
+          description: Lab order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabOrderResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/lab-orders/{id}:
+    patch:
+      tags: [Clinical]
+      summary: Update lab result
+      description: Update laboratory test result (doctor only)
+      operationId: updateLabOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Lab order ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabOrderUpdateRequest'
+      responses:
+        '200':
+          description: Lab order updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabOrderResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Lab order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/walk-ins:
+    get:
+      tags: [Walk-ins]
+      summary: List walk-in queue
+      description: Retrieve current walk-in patient queue
+      operationId: listWalkIns
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Walk-ins retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalkInsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Walk-ins]
+      summary: Check in walk-in patient
+      description: Register a new walk-in patient (admin/receptionist)
+      operationId: createWalkIn
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalkInCreateRequest'
+      responses:
+        '201':
+          description: Walk-in created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalkInResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/walk-ins/{id}:
+    patch:
+      tags: [Walk-ins]
+      summary: Update walk-in status
+      description: Update walk-in patient status
+      operationId: updateWalkIn
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Walk-in ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WalkInUpdateRequest'
+      responses:
+        '200':
+          description: Walk-in updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalkInResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Walk-in not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/leave-requests:
+    get:
+      tags: [Leave]
+      summary: List leave requests
+      description: Retrieve leave requests (filtered by user role)
+      operationId: listLeaveRequests
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Leave requests retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequestsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [Leave]
+      summary: Submit leave request
+      description: Submit a new leave request (doctor only)
+      operationId: createLeaveRequest
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaveRequestCreateRequest'
+      responses:
+        '201':
+          description: Leave request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequestResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/leave-requests/{id}:
+    patch:
+      tags: [Leave]
+      summary: Approve/reject leave request
+      description: Approve or reject a leave request (admin only)
+      operationId: updateLeaveRequest
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Leave request ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaveRequestUpdateRequest'
+      responses:
+        '200':
+          description: Leave request updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequestResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Leave request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      description: Retrieve user notifications
+      operationId: listNotifications
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Notifications retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      description: Mark a specific notification as read
+      operationId: markNotificationRead
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Notification ID
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Notification not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      description: Mark all user notifications as read
+      operationId: markAllNotificationsRead
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/audit-events:
+    get:
+      tags: [Audit]
+      summary: List audit events
+      description: Retrieve audit log (admin only)
+      operationId: listAuditEvents
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Audit events retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventsResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/reports/summary:
+    get:
+      tags: [Reports]
+      summary: Generate operational report
+      description: Generate operational statistics report (admin only)
+      operationId: generateSummaryReport
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-01-01"
+          description: Start date in YYYY-MM-DD format
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2024-01-31"
+          description: End date in YYYY-MM-DD format
+      responses:
+        '200':
+          description: Report generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryReportResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Supabase Auth
+
+  schemas:
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+        timestamp:
+          type: string
+          format: date-time
+        dependency:
+          type: string
+          description: Present when status is unavailable
+
+    MetricsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: string
+          description: Server uptime in human-readable format
+        database:
+          type: object
+          properties:
+            connected:
+              type: boolean
+            current_time:
+              type: string
+              format: date-time
+        environment:
+          type: string
+          enum: [development, test, production]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: object
+          description: Additional error details (optional)
+
+    OtpVerifyRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: 6-digit OTP code
+
+    ProfileResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Profile'
+
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, doctor, patient, receptionist, student, lecturer, staff]
+        phone:
+          type: string
+          nullable: true
+          pattern: '^\+[1-9]\d{7,14}$'
+        user_type:
+          type: string
+          nullable: true
+        student_number:
+          type: string
+          nullable: true
+        staff_number:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+        program:
+          type: string
+          nullable: true
+
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          minLength: 2
+          maxLength: 160
+          nullable: true
+        address_line1:
+          type: string
+          maxLength: 200
+          nullable: true
+        address_line2:
+          type: string
+          maxLength: 200
+          nullable: true
+        city:
+          type: string
+          maxLength: 120
+          nullable: true
+        province:
+          type: string
+          maxLength: 120
+          nullable: true
+        postal_code:
+          type: string
+          maxLength: 20
+          nullable: true
+
+    PatientsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Patient'
+
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+          pattern: '^\+[1-9]\d{7,14}$'
+        user_type:
+          type: string
+          nullable: true
+        student_number:
+          type: string
+          nullable: true
+        staff_number:
+          type: string
+          nullable: true
+        department:
+          type: string
+          nullable: true
+        program:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    PatientCreateRequest:
+      type: object
+      required:
+        - email
+        - fullName
+        - phone
+        - userType
+      properties:
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 160
+        phone:
+          type: string
+          pattern: '^\+[1-9]\d{7,14}$'
+        userType:
+          type: string
+          enum: [Student, Lecturer, SPU Staff]
+        studentNumber:
+          type: string
+          maxLength: 40
+          nullable: true
+        staffNumber:
+          type: string
+          maxLength: 40
+          nullable: true
+        department:
+          type: string
+          maxLength: 120
+          nullable: true
+        program:
+          type: string
+          maxLength: 160
+          nullable: true
+
+    PatientResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Patient'
+
+    DoctorsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Doctor'
+
+    Doctor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        specialty:
+          type: string
+        department:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+
+    DoctorCreateRequest:
+      type: object
+      required:
+        - userId
+        - fullName
+        - specialty
+      properties:
+        userId:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 160
+        specialty:
+          type: string
+          minLength: 2
+          maxLength: 120
+        department:
+          type: string
+          maxLength: 120
+          nullable: true
+
+    DoctorResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Doctor'
+
+    StaffCreateRequest:
+      type: object
+      required:
+        - email
+        - role
+        - fullName
+        - phone
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [doctor, receptionist]
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 160
+        phone:
+          type: string
+          pattern: '^\+[1-9]\d{7,14}$'
+        department:
+          type: string
+          maxLength: 120
+          nullable: true
+        specialty:
+          type: string
+          maxLength: 120
+          nullable: true
+
+    StaffResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            role:
+              type: string
+            fullName:
+              type: string
+            invitationSent:
+              type: boolean
+
+    AppointmentsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Appointment'
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_user_id:
+          type: string
+          format: uuid
+        patient_name:
+          type: string
+        doctor_id:
+          type: string
+          format: uuid
+        doctor_name:
+          type: string
+        specialty:
+          type: string
+        consultation_type:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+        mode:
+          type: string
+          enum: [in_person, telehealth]
+        status:
+          type: string
+          enum: [pending, confirmed, in_progress, completed, cancelled, no_show]
+
+    AppointmentCreateRequest:
+      type: object
+      required:
+        - slotId
+        - consultationType
+        - mode
+      properties:
+        slotId:
+          type: string
+          format: uuid
+        consultationType:
+          type: string
+          minLength: 2
+          maxLength: 120
+        mode:
+          type: string
+          enum: [in_person, telehealth]
+        reason:
+          type: string
+          maxLength: 2000
+          nullable: true
+
+    AppointmentResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Appointment'
+
+    AppointmentStatusUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [confirmed, in_progress, completed, cancelled, no_show]
+
+    AppointmentRescheduleRequest:
+      type: object
+      required:
+        - slotId
+      properties:
+        slotId:
+          type: string
+          format: uuid
+
+    AvailabilityResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AvailabilitySlot'
+
+    AvailabilitySlot:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        doctor_id:
+          type: string
+          format: uuid
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+
+    AvailabilitySlotCreateRequest:
+      type: object
+      required:
+        - doctorId
+        - startsAt
+        - endsAt
+      properties:
+        doctorId:
+          type: string
+          format: uuid
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+
+    AvailabilitySlotResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AvailabilitySlot'
+
+    ClinicSettingsResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/ClinicSettings'
+
+    ClinicSettings:
+      type: object
+      properties:
+        timezone:
+          type: string
+        opens_at:
+          type: string
+          pattern: '^\\d{2}:\\d{2}$'
+        closes_at:
+          type: string
+          pattern: '^\\d{2}:\\d{2}$'
+        default_appointment_minutes:
+          type: integer
+          minimum: 10
+          maximum: 30
+        minimum_reschedule_notice_hours:
+          type: integer
+          minimum: 0
+          maximum: 168
+
+    ClinicSettingsUpdateRequest:
+      type: object
+      required:
+        - timezone
+        - opensAt
+        - closesAt
+        - defaultAppointmentMinutes
+        - minimumRescheduleNoticeHours
+      properties:
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 100
+        opensAt:
+          type: string
+          pattern: '^\\d{2}:\\d{2}$'
+        closesAt:
+          type: string
+          pattern: '^\\d{2}:\\d{2}$'
+        defaultAppointmentMinutes:
+          type: integer
+          minimum: 10
+          maximum: 30
+        minimumRescheduleNoticeHours:
+          type: integer
+          minimum: 0
+          maximum: 168
+
+    PatientVisitsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PatientVisit'
+
+    PatientVisit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        appointment_id:
+          type: string
+          format: uuid
+          nullable: true
+        visit_date:
+          type: string
+          format: date-time
+        chief_complaint:
+          type: string
+        assessment:
+          type: string
+          nullable: true
+        plan:
+          type: string
+          nullable: true
+        temperature_c:
+          type: number
+          nullable: true
+          minimum: 25
+          maximum: 45
+        blood_pressure_systolic:
+          type: integer
+          nullable: true
+          minimum: 40
+          maximum: 300
+        blood_pressure_diastolic:
+          type: integer
+          nullable: true
+          minimum: 20
+          maximum: 200
+        heart_rate:
+          type: integer
+          nullable: true
+          minimum: 20
+          maximum: 250
+        respiratory_rate:
+          type: integer
+          nullable: true
+          minimum: 5
+          maximum: 80
+        oxygen_saturation:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+        weight_kg:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 1000
+
+    PatientVisitCreateRequest:
+      type: object
+      required:
+        - appointmentId
+        - chiefComplaint
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        chiefComplaint:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        history:
+          type: string
+          maxLength: 10000
+          nullable: true
+        examination:
+          type: string
+          maxLength: 10000
+          nullable: true
+        assessment:
+          type: string
+          maxLength: 10000
+          nullable: true
+        plan:
+          type: string
+          maxLength: 10000
+          nullable: true
+        temperatureC:
+          type: number
+          nullable: true
+          minimum: 25
+          maximum: 45
+        bloodPressureSystolic:
+          type: integer
+          nullable: true
+          minimum: 40
+          maximum: 300
+        bloodPressureDiastolic:
+          type: integer
+          nullable: true
+          minimum: 20
+          maximum: 200
+        heartRate:
+          type: integer
+          nullable: true
+          minimum: 20
+          maximum: 250
+        respiratoryRate:
+          type: integer
+          nullable: true
+          minimum: 5
+          maximum: 80
+        oxygenSaturation:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+        weightKg:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 1000
+
+    PatientVisitResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/PatientVisit'
+
+    PrescriptionsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Prescription'
+
+    Prescription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        visit_id:
+          type: string
+          format: uuid
+        medication:
+          type: string
+        dosage:
+          type: string
+        route:
+          type: string
+          nullable: true
+        frequency:
+          type: string
+        duration:
+          type: string
+        quantity:
+          type: string
+          nullable: true
+        instructions:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, discontinued, completed]
+        created_at:
+          type: string
+          format: date-time
+
+    PrescriptionCreateRequest:
+      type: object
+      required:
+        - visitId
+        - medication
+        - dosage
+        - frequency
+        - duration
+      properties:
+        visitId:
+          type: string
+          format: uuid
+        medication:
+          type: string
+          minLength: 1
+          maxLength: 200
+        dosage:
+          type: string
+          minLength: 1
+          maxLength: 200
+        route:
+          type: string
+          maxLength: 80
+          nullable: true
+        frequency:
+          type: string
+          minLength: 1
+          maxLength: 200
+        duration:
+          type: string
+          minLength: 1
+          maxLength: 200
+        quantity:
+          type: string
+          maxLength: 100
+          nullable: true
+        instructions:
+          type: string
+          maxLength: 4000
+          nullable: true
+
+    PrescriptionResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Prescription'
+
+    LabOrdersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabOrder'
+
+    LabOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        visit_id:
+          type: string
+          format: uuid
+        test_name:
+          type: string
+        status:
+          type: string
+          enum: [ordered, collected, processing, resulted, cancelled]
+        result_summary:
+          type: string
+          nullable: true
+        resulted_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    LabOrderCreateRequest:
+      type: object
+      required:
+        - visitId
+        - testName
+      properties:
+        visitId:
+          type: string
+          format: uuid
+        testName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        clinicalIndication:
+          type: string
+          maxLength: 4000
+          nullable: true
+
+    LabOrderResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/LabOrder'
+
+    LabOrderUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [collected, processing, resulted, cancelled]
+        resultSummary:
+          type: string
+          maxLength: 10000
+          nullable: true
+
+    WalkInsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WalkIn'
+
+    WalkIn:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        patient_name:
+          type: string
+        contact_phone:
+          type: string
+          nullable: true
+        reason:
+          type: string
+        urgency:
+          type: string
+          enum: [low, medium, high, emergency]
+        status:
+          type: string
+          enum: [waiting, triaged, assigned, in_progress, completed, cancelled]
+        assigned_doctor_id:
+          type: string
+          format: uuid
+          nullable: true
+        arrived_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    WalkInCreateRequest:
+      type: object
+      required:
+        - patientName
+        - reason
+        - urgency
+      properties:
+        patientUserId:
+          type: string
+          format: uuid
+          nullable: true
+        patientName:
+          type: string
+          minLength: 2
+          maxLength: 160
+        contactPhone:
+          type: string
+          maxLength: 24
+          nullable: true
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        urgency:
+          type: string
+          enum: [low, medium, high, emergency]
+
+    WalkInResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/WalkIn'
+
+    WalkInUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [triaged, assigned, in_progress, completed, cancelled]
+        urgency:
+          type: string
+          enum: [low, medium, high, emergency]
+          nullable: true
+        doctorId:
+          type: string
+          format: uuid
+          nullable: true
+
+    LeaveRequestsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaveRequest'
+
+    LeaveRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        doctor_user_id:
+          type: string
+          format: uuid
+        starts_on:
+          type: string
+          format: date
+        ends_on:
+          type: string
+          format: date
+        leave_type:
+          type: string
+          enum: [annual, sick, emergency, personal]
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled]
+        review_note:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    LeaveRequestCreateRequest:
+      type: object
+      required:
+        - startsOn
+        - endsOn
+        - leaveType
+        - reason
+      properties:
+        startsOn:
+          type: string
+          format: date
+        endsOn:
+          type: string
+          format: date
+        leaveType:
+          type: string
+          enum: [annual, sick, emergency, personal]
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 4000
+
+    LeaveRequestResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/LeaveRequest'
+
+    LeaveRequestUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        reviewNote:
+          type: string
+          maxLength: 2000
+          nullable: true
+
+    NotificationsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        message:
+          type: string
+        category:
+          type: string
+          enum: [appointment, system]
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    NotificationResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Notification'
+
+    AuditEventsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    SummaryReportResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/SummaryReport'
+
+    SummaryReport:
+      type: object
+      properties:
+        appointments:
+          type: integer
+        completed:
+          type: integer
+        cancelled:
+          type: integer
+        no_show:
+          type: integer

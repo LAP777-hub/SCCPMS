@@ -1,0 +1,70 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist
+build
+.cache
+.next
+out
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+*.md
+
+# Testing
+coverage
+.nyc_output
+__snapshots__
+
+# Screenshots and images (unless needed for app)
+screenshots
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+!public/*.svg
+!public/*.png
+!public/*.jpg
+
+# Server (only needed for backend build)
+server
+
+# Scripts (only needed for deployment)
+scripts
+
+# Misc
+*.log
+*.tmp
+.cache
+.temp
