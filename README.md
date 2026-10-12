@@ -730,13 +730,6 @@ SCCPMS/
 
 ---
 
-## Developer
-
-| Name | Role |
-|---|---|
-| **Lucky Pinga** | Sole Developer, System Architect, UI/UX Designer, Full-Stack Developer, Database Designer & Project Lead |
-
----
 
 ## Lessons Learned
 
