@@ -41,7 +41,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest isolated database command | **3/3 passed, 0 skipped, 0 failed** | 139.5s overall; deletion/registration/workflow suites; all temporary schemas cleaned up |
+| Latest stable isolated database command | **5/5 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI, 2.704s; includes private Auth audits, shared limits/budgets and late-commit revisions; local connection-reset failures retained in section11d |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -241,8 +241,8 @@ Commands below are an inventory/reproduction guide, not a statement that every c
 | `npm run lint` | Active frontend/config/browser-test lint | Zero errors; one existing Fast Refresh warning plus `.eslintignore` deprecation notice |
 | `npm run typecheck --prefix server` | API TypeScript checks | Earlier no-emit command passed; latest successful TypeScript build also checks API types |
 | `npm run build --prefix server` | Compile/typecheck API | Latest build passed |
-| `npm test --prefix server` | Node test runner, all `server/tests/*.test.ts`, concurrency 1 | Latest 188 passed/three deliberate DB skips/zero failures; 191 total |
-| `npm run test:database --prefix server` | Opt-in isolated DB workflow/registration/deletion suites | Latest 3/3 passed, zero skips/failures, 139.5s; cleanup completed |
+| `npm test --prefix server` | Node test runner, all `server/tests/*.test.ts`, concurrency 1 | Latest CI: 214 total, 209 passed/five deliberate DB skips/zero failures, 41.407s |
+| `npm run test:database --prefix server` | Opt-in isolated workflow/registration/deletion/serverless suites | Latest CI: 5/5 passed, zero skips/failures, 2.704s; local network failures remain documented |
 | `node --import tsx --test tests/trusted-auth.test.ts` from `server/` | Focused trusted Auth/provider/profile/ban behavior and safe timeout diagnostics | Latest 28/28 passed |
 | `npm --prefix server run connections:check` | Local frontend/API/CORS and upstream Auth/PostgreSQL connection checks; no messages/account changes | Expected exit 1 while database ports are unreachable; stable health 503 recorded |
 | `npm run test:ui` | Chrome Playwright browser regression suite against preview 5178 | First 55-case attempt: 54 pass/one timeout |
@@ -266,7 +266,7 @@ Commands below are an inventory/reproduction guide, not a statement that every c
 | `npm run security:audit` | Basic configuration/dependency/permission audit | Available; not a penetration test; no new complete security certification claimed |
 | `npm run performance:test` | Endpoint timing script | Available; no production load/scale acceptance result recorded |
 | `docker compose config`, checker syntax and workflow inspection | Static deployment/configuration validation | Recorded syntax/YAML/Compose checks passed |
-| GitHub CI workflow / Docker publishing / hosted deployment | Remote pipeline and release execution | Not executed as part of recorded local validation |
+| GitHub CI workflow / hosted Vercel deployment | Remote pipeline and release execution | Backend/security CI pass and frontend deploy READY; initial failures and current release checks in section11d; Docker publishing is optional/manual |
 | `sms:check` / `sms:configure` | Historical SMS helpers | Retained; not required by the active email OTP runtime |
 
 Use one browser at a time when local resources are constrained. Playwright's default output directory can remove earlier ignored review scripts/artifacts; use a separate `--output` when preserving evidence.
@@ -277,7 +277,7 @@ Use one browser at a time when local resources are constrained. Playwright's def
 | --- | --- |
 | Latest application builds/typechecks | Pass; latest server TypeScript build checks API types |
 | Latest unit/policy/route regressions | Pass: 209/five explicit opt-in DB skips/zero failures on Node22 |
-| Real isolated database regressions | Earlier 3/3 passed; not rerun during the current TCP outage; temporary schemas cleaned |
+| Real isolated database regressions | Latest stable CI 5/5 passed; intermittent local connection-reset attempts remain recorded; temporary schemas cleaned |
 | Browser behavior and responsive acceptance under mocks | Latest full 79-test run passed; 128 earlier fixed-pane/readable-text views passed; prior failures retained |
 | New deletion/suspension final verification | Server and database pass; all 67 distinct browser cases verified through initial/focused correction runs; first full-command failures retained |
 | Deletion migration 019 on configured application database | Applied; four columns/two constraints verified read-only; no existing account deleted |
@@ -847,6 +847,39 @@ the configuration successfully.
 Cloud rebuild, HTTP/database health, deployed browser checks and production Auth
 redirect results are recorded after these corrections. University-domain DNS and
 actual received OTP/invitation mail remain separate acceptance requirements.
+
+Commit `e6dbaec` reached GitHub after selecting the saved GitHub account explicitly
+when its credential manager stalled. The frontend deployment reached READY and
+four actual public browser views passed: desktop/mobile login/registration, loaded
+logos, no viewport overflow/runtime errors, and NAS faculty labels. The API's
+second cloud compilation still rejected Helmet despite local module checks. A
+native JavaScript entry (`server/app.mjs`) now loads the API's existing compiled
+output, preserving the full `tsc` build and existing clinic middleware.
+
+The final local five-case database command on Node 22 completed in 177.25s:
+three passed, two failed, zero skipped. The corrected workflow case passed all
+private Auth-audit assertions; the two Vercel cases lost their database connections
+with `ECONNRESET` during cleanup. Their earlier focused 2/2 result is retained;
+neither failed run is presented as a full pass. CI's isolated PostgreSQL run is
+the stable release check for all five cases.
+
+GitHub run `38441263323` completed backend and security jobs successfully:
+214 unit cases, 209 passes and five intentional database skips in 41.407s;
+all five real PostgreSQL cases passed with zero skips/failures in 2.704s.
+Its browser run passed 78/79: the held-restoration regression exposed a real
+race when successful OTP verification changed the request generation before
+the same account's delayed profile response arrived. The valid profile was
+discarded. A deterministic rerun against the old bundle failed in 8.2s with
+"Account profile unavailable". Both delayed responses are now held explicitly
+while the source correction preserves current-account successes across OTP changes.
+
+The corrected profile/OTP regression passed in 1.5s against the rebuilt Node 22
+frontend. A focused Auth/callback/suspension/session run passed56/57; the remaining
+network-retry test inspected its exact send count before the asynchronous send
+completed. It now waits for the fixture's accepted-delivery status before checking
+the same exact send/session/logout counts. Existing account-switch and delayed
+error guards remain asserted. The JavaScript API entry also passed four local
+HTTP checks: service identity, protected401, CORS204 and JSON404/security headers.
 
 ## 12. Supporting documents
 

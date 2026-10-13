@@ -5,8 +5,10 @@ identity, profiles and PostgreSQL clinic records. Email OTP uses Resend.
 
 For Vercel, select `server` as Root Directory, Express as framework, Node 22.x,
 `npm ci --include=dev` for installation and `npm run build` for the build.
-`src/app.ts` exports the app without opening a port. `src/index.ts` runs the
-local/container listener. [Complete deployment guide](../docs/vercel-deployment.md).
+`src/app.ts` exports the typed app without opening a port. After compilation,
+`app.mjs` exposes that same app to Vercel's native JavaScript Express runtime.
+`src/index.ts` runs the local/container listener.
+[Complete deployment guide](../docs/vercel-deployment.md).
 
 ## Local development
 

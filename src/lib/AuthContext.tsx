@@ -403,12 +403,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (checkingCallback || callbackAccount.current === authenticatedUserId || setup.current?.userId === authenticatedUserId) return;
     const expectedSession = currentSession.current;
     const version = sessionRequestVersion();
-    const isCurrent = () => !cancelled && version === sessionRequestVersion() && sameAuthSession(expectedSession, currentSession.current);
+    const attempt = signInAttempt.current;
+    const isCurrentSession = () => !cancelled && attempt === signInAttempt.current
+      && sameAuthSession(expectedSession, currentSession.current);
+    const isCurrent = () => version === sessionRequestVersion() && isCurrentSession();
     setLoading(true);
     (async () => {
       try {
         const { data } = await apiRequest<{ data: Profile }>('/auth/profile');
-        if (!isCurrent()) return;
+        // OTP completion invalidates older verification requests, but a valid
+        // profile for this unchanged login must still finish restoring it.
+        if (!isCurrentSession()) return;
         setProfile(data);
         accountOtpEmail.current = maskOtpEmail(data.email);
         setPendingOtpEmail(accountOtpEmail.current);
@@ -417,7 +422,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setOtpError(error instanceof Error ? error.message : 'Unable to load your account profile.');
       } finally {
-        if (!cancelled && sameAuthSession(expectedSession, currentSession.current)) setLoading(false);
+        if (isCurrentSession()) setLoading(false);
       }
     })();
     return () => { cancelled = true; };

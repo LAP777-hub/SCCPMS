@@ -202,6 +202,7 @@ test('a transient profile failure after valid credentials preserves the session 
   state.profileFailure = null;
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('Fixture verification code accepted.');
   await expect(page.locator('.admin-shell,.patient-shell,.reception-shell')).toHaveCount(0);
   expect(state.activeSessionId).not.toBe(firstSession);
   expect(state.passwordLoginCount).toBe(2);
@@ -244,6 +245,7 @@ test('a temporary profile network failure retains credentials and retries under 
   state.profileFailure = null;
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('Fixture verification code accepted.');
   await expect(page.locator('.admin-shell,.patient-shell,.reception-shell')).toHaveCount(0);
   expect(state.activeSessionId).not.toBe(firstSession);
   expect(state.passwordLoginCount).toBe(2);
@@ -336,6 +338,7 @@ for (const responseKind of ['permanent403', 'mismatchedPatient'] as const) {
       await page.getByRole('button', { name: 'Back', exact: true }).click();
       await signIn(page, false);
       await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
+      await expect(page.getByRole('status')).toHaveText('Fixture verification code accepted.');
       const replacementSession = state.activeSessionId;
       expect(replacementSession).not.toBe(firstSession);
       expect(state.passwordLoginCount).toBe(2);

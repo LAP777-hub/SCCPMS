@@ -106,6 +106,15 @@ test('an older restoration result cannot undo successful email verification', as
   await signIn(page, 'admin');
   await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
 
+  let releaseProfile!: () => void;
+  const profileGate = new Promise<void>(resolve => { releaseProfile = resolve; });
+  let profileStarted!: () => void;
+  const profileRequested = new Promise<void>(resolve => { profileStarted = resolve; });
+  await page.route('**/localhost:4000/auth/profile', async route => {
+    profileStarted();
+    await profileGate;
+    await route.fallback();
+  });
   let releaseStatus!: () => void;
   const statusGate = new Promise<void>(resolve => { releaseStatus = resolve; });
   let statusStarted!: () => void;
@@ -119,9 +128,19 @@ test('an older restoration result cannot undo successful email verification', as
     statusFinished();
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await started;
+  await Promise.all([started, profileRequested]);
+  await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
+  const verificationResponse = page.waitForResponse(response => response.url().endsWith('/auth/otp/verify'));
   await page.getByLabel('6-Digit Code').fill('123456');
   await page.getByRole('button', { name: 'Verify & Sign In' }).click();
+  expect((await verificationResponse).ok()).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toHaveCount(0);
+  // Successful OTP verification cannot open a dashboard before the trusted
+  // profile arrives, nor discard that profile when it arrives afterward.
+  await expect(page.locator('.admin-shell')).toHaveCount(0);
+  const profileResponse = page.waitForResponse(response => response.url().endsWith('/auth/profile'));
+  releaseProfile();
+  expect((await profileResponse).ok()).toBe(true);
   await expect(page.locator('.admin-shell')).toBeVisible();
   const statusResponse = page.waitForResponse(response => response.url().endsWith('/auth/otp/status'));
   releaseStatus();

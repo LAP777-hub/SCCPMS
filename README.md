@@ -22,7 +22,8 @@ SCCPMS/
   vercel.json                  Frontend Vite build and SPA routing
   .vercelignore                Deployment input exclusions
   server/
-    src/app.ts                 Express app exported for Vercel
+    app.mjs                    Vercel entry for the compiled Express app
+    src/app.ts                 Typed Express app and existing middleware
     src/index.ts               Local port listener
     src/academic-catalogue.json Shared faculty/programme catalogue
     sql/                       Versioned clinic database migrations

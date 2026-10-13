@@ -5,9 +5,9 @@
   "buildCommand": "npm run build",
   "regions": ["dub1"],
   "functions": {
-    "src/app.ts": {
+    "app.mjs": {
       "maxDuration": 60,
-      "includeFiles": "{certs/**,src/academic-catalogue.json}"
+      "includeFiles": "{certs/**,dist/academic-catalogue.json}"
     }
   }
 }
