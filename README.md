@@ -98,6 +98,14 @@ project/
 │   └── functions/         # Supabase edge functions
 └── public/               # Static assets
 ```
+## Team Members and Responsibilities
+
+| Team Member | Role | Responsibilities |
+|---|---|---|
+| Lucky Albert Pinga | Backend Developer | Supabase database, authentication, and backend functionality. |
+| Lucky Malegole Siloane | Frontend Developer | User interface, responsive design, and frontend integration. |
+| Lungelo Mjuleka | Tester | System testing, bug reporting, and quality assurance. |
+| Katleho Pitikoe | System Architect & Documentation | System requirements, architecture, technical specifications, and documentation. |
 
 ## 🚀 Quick Start
 
