@@ -2,9 +2,9 @@
 
 **Report date:** 13 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the latest full browser run passes **79/79 tests**, including temporary login dependency recovery, password visibility, registration, account deletion/suspension, callbacks and session persistence. The latest Node22 server run has **209 passes, 5 intentional database skips and no failures**. Live login is currently blocked by PostgreSQL TCP connectivity from this computer on university Wi-Fi; the frontend/API and Supabase HTTPS endpoints respond. Earlier successes, failures and corrections remain recorded below. University email delivery and hosted production acceptance remain incomplete.
+**Status:** both Git-connected Vercel production deployments are live, and the deployed API/database health returns 200. GitHub CI passes **79/79 browser tests**, backend checks and security checks. The server unit suite has **209 passes, 5 intentional database skips and no failures**; the separate real PostgreSQL suite passes **5/5 with no skips**. Production Auth redirects pass 4/4. Local university-network timeouts and connection resets remain recorded separately. University sender DNS verification and actual received-email/clinical acceptance remain incomplete.
 
-This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier `frontend/` and `backend/` prototype directories are outside the active release validation.
+This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
 ## 1. Evidence and test boundaries
 
@@ -41,7 +41,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest stable isolated database command | **5/5 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI, 2.704s; includes private Auth audits, shared limits/budgets and late-commit revisions; local connection-reset failures retained in section11d |
+| Latest stable isolated database command | **5/5 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI, 2.704s; includes private Auth audits, shared limits/budgets and late-commit revisions; local connection-reset failures retained in section 11d |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -51,7 +51,7 @@ These are completed results available when this report was assembled. Counts fro
 | Latest invitation modal/menu checks | Passed | 320×640 modal and all four menu ARIA states; see section 6 |
 | Final circular auth logo check | **4 browser views passed** | Login/registration at 320×640 and 1366×768; loaded 50% border radius, square 104/156px geometry, no overflow or runtime errors |
 | Earlier runtime smoke | Passed at that milestone | API/database health 200, frontend 200, unauthenticated protected API 401; superseded by the current connection incident below |
-| Current runtime connectivity | **Blocked: database ports time out** | Frontend 200 and HTTP/CORS routes respond; API health503/database dependency; see section 11b |
+| Deployed runtime connectivity | **Passed: frontend/API/database health 200** | Seven live HTTP checks pass; campus-network failures remain historical/local evidence in sections 11b/11d |
 | Hosted development redirect routing | Passed | Saved/read back 5173; default/signup/invite/recovery HTTP 303 probes resolve to the development frontend |
 | Resend key/domain API | Passed key acceptance | Authenticated read-only domain lookup succeeded; this is not delivery acceptance |
 | University sending domain | **Blocked pending DNS verification** | `clinic.spu.ac.za` prepared; actual university DNS publication/verification incomplete |
@@ -60,7 +60,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **79 passed, 0 failed** | Complete final Vercel preparation run; approximately 1.9 minutes; earlier77+focused2 retained as history |
+| Latest full browser run | **79 passed, 0 failed** | GitHub Linux CI for `ddc456a`, 1.2 minutes; deterministic profile/OTP race and existing role/session/registration checks pass |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -266,7 +266,7 @@ Commands below are an inventory/reproduction guide, not a statement that every c
 | `npm run security:audit` | Basic configuration/dependency/permission audit | Available; not a penetration test; no new complete security certification claimed |
 | `npm run performance:test` | Endpoint timing script | Available; no production load/scale acceptance result recorded |
 | `docker compose config`, checker syntax and workflow inspection | Static deployment/configuration validation | Recorded syntax/YAML/Compose checks passed |
-| GitHub CI workflow / hosted Vercel deployment | Remote pipeline and release execution | Backend/security CI pass and frontend deploy READY; initial failures and current release checks in section11d; Docker publishing is optional/manual |
+| GitHub CI workflow / hosted Vercel deployment | Remote pipeline and release execution | Backend/security CI pass and frontend deploy READY; initial failures and current release checks in section 11d; Docker publishing is optional/manual |
 | `sms:check` / `sms:configure` | Historical SMS helpers | Retained; not required by the active email OTP runtime |
 
 Use one browser at a time when local resources are constrained. Playwright's default output directory can remove earlier ignored review scripts/artifacts; use a separate `--output` when preserving evidence.
@@ -281,19 +281,19 @@ Use one browser at a time when local resources are constrained. Playwright's def
 | Browser behavior and responsive acceptance under mocks | Latest full 79-test run passed; 128 earlier fixed-pane/readable-text views passed; prior failures retained |
 | New deletion/suspension final verification | Server and database pass; all 67 distinct browser cases verified through initial/focused correction runs; first full-command failures retained |
 | Deletion migration 019 on configured application database | Applied; four columns/two constraints verified read-only; no existing account deleted |
-| Current live API/database health | Blocked: PostgreSQL TCP timeouts and health 503; frontend, HTTP routes and CORS respond |
-| Circular-logo visual smoke | Earlier four views passed; assets/layout unchanged by the session fix |
-| Hosted development redirect routing | Pass for localhost:5173 |
+| Current live API/database health | Pass: deployed API `/healthz`200 with verified database TLS; campus-network failures remain separately recorded |
+| Circular-logo visual smoke | Four actual production desktop/mobile login/register views pass; loaded 172.8px/120px logos and no viewport overflow/runtime errors |
+| Hosted Auth redirect routing | Pass: production default/signup/invite/recovery redirects 4/4; prior local allow-list entries preserved |
 | University sender DNS/custom-domain verification | Blocked pending university IT/provider verification |
 | Received university OTP, invitation, confirmation and recovery acceptance | Pending |
-| Hosted HTTPS/production origin/API routing and database TLS acceptance | Pending deployment environment |
+| Hosted HTTPS/production origin/API routing and database TLS acceptance | Pass: both production deployments READY, frontend calls the deployed API; protected GET/POST 401, CORS 204, unknown-route JSON 404 |
 | Monitoring, backup/restore, real concurrent user/load and institutional clinical/privacy acceptance | Not established by this report |
 
 The current results support continued development and a reviewable demonstration using the stated fixtures. A sale/pilot/live university rollout must complete the outstanding provider and deployment gates; passing tests does not justify a 100% production-readiness claim.
 
 ## 10. Source test inventory
 
-The inventory below is read from the active test source files. It includes the actual named tests and describe-group headings. Template/variable titles represent parameterized cases, not one literal execution each; describe headings are not tests. Executed totals come from the run summaries above. The final inventory includes all three opt-in database files, the new patient-deletion policy tests, seven deletion browser cases and five suspension browser cases.
+The inventory below is read from the active test source files. It includes the actual named tests and describe-group headings. Template/variable titles represent parameterized cases, not one literal execution each; describe headings are not tests. Executed totals come from the run summaries above. Four opt-in database files now provide five cases, including the two serverless integration cases added in section 11c. Earlier inventories retain their historical case counts.
 
 ### [server/tests/account-deletion-database.test.ts](../server/tests/account-deletion-database.test.ts)
 
@@ -769,7 +769,7 @@ evidence; those suites were not rerun while TCP is unreachable.
 
 **Open live acceptance gate:** restore outbound PostgreSQL access on 6543 for
 clinic queries and 5432 for the session listener, rerun
-`npm --prefix server run connections:check`, require health200, and complete an
+`npm --prefix server run connections:check`, require health 200, and complete an
 authorized real login with its received email OTP. The passing browser fixtures
 do not resolve this live connectivity blocker. See the [port/session diagnostic
 guide](session-connectivity.md) for the exact endpoint and recheck steps.
@@ -874,12 +874,39 @@ discarded. A deterministic rerun against the old bundle failed in 8.2s with
 while the source correction preserves current-account successes across OTP changes.
 
 The corrected profile/OTP regression passed in 1.5s against the rebuilt Node 22
-frontend. A focused Auth/callback/suspension/session run passed56/57; the remaining
+frontend. A focused Auth/callback/suspension/session run passed 56/57; the remaining
 network-retry test inspected its exact send count before the asynchronous send
 completed. It now waits for the fixture's accepted-delivery status before checking
 the same exact send/session/logout counts. Existing account-switch and delayed
 error guards remain asserted. The JavaScript API entry also passed four local
-HTTP checks: service identity, protected401, CORS204 and JSON404/security headers.
+HTTP checks: service identity, protected 401, CORS 204 and JSON 404/security headers.
+
+### Completed hosted release checks
+
+Commit `ddc456ab6e43398dc7b436326b540237126145d4` is published on GitHub and
+both connected Vercel projects reached READY. The focused suspension correction
+passed 11/11 in 19.3s; the full [GitHub workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38443989130)
+then passed all three jobs, with [79/79 browser cases](https://github.com/LAP777-hub/SCCPMS/actions/runs/38443989130/job/115457477617)
+in 1.2 minutes. No live Auth accounts or emails were created by those tests.
+
+| Actual hosted check | Completed result |
+| --- | --- |
+| [Frontend](https://sccpms.vercel.app) | READY; built assets reference the deployed API and correct Supabase project, with no localhost API |
+| [API](https://sccpms-api.vercel.app) | READY; service identity JSON 200; function region `dub1` |
+| [Database health](https://sccpms-api.vercel.app/healthz) | HTTP 200, status `ok`, using verified TLS and the configured transaction pooler |
+| Seven HTTP assertions | All pass: frontend home/assets/deep link/invite callback; API identity/health; three protected GET/POST 401 checks; CORS 204; JSON 404 |
+| Actual responsive browser | Four views pass: desktop 1440×900 and phone 390×844 login/register; loaded square logos 172.8px/120px, no overflow/runtime errors, NAS labels |
+| Deployed real Kimberley address searches | HTTP 200 from Photon for both queries: Long Street returned two results and New Park one; each supplies coordinates within Kimberley |
+| Hosted Auth settings | Production Site URL saved; all five production allow-list URLs present; previous local entries preserved |
+| Auth redirect propagation | Immediate probe still saw cached localhost default and failed; subsequent read-only probe passed 4/4 HTTP 303 default/signup/invite/recovery to production |
+| Resend read-only domain check | First request timed out; successful HTTP 200 retry confirms `clinic.spu.ac.za` remains `not_started`; no mail sent |
+| Publication security | Final implementation index: 453 files, zero credential/private-archive findings; GitHub security job also passes |
+
+No application changes remain for this deployment correction. The school must
+complete sender DNS verification and production SMTP/inbox acceptance before
+email onboarding/OTP can be declared working. The public Photon provider's
+availability and sustained usage policy, backups, clinical/privacy review and
+real operator/load acceptance remain documented operational requirements.
 
 ## 12. Supporting documents
 
@@ -892,4 +919,4 @@ HTTP checks: service identity, protected401, CORS204 and JSON404/security header
 - [Login session and port diagnostics](session-connectivity.md)
 - [GitHub/Vercel deployment](vercel-deployment.md)
 
-This report is maintained from recorded command results, source inventory and the retained local artifacts. Pending release gates include the current database connection-path failure, external email, hosting and institutional operational acceptance.
+This report is maintained from recorded command results, source inventory and the retained local artifacts. Hosting and cloud database connectivity pass. Pending release gates include external university email and institutional operational acceptance; local university-network instability remains separately documented.

@@ -4,6 +4,13 @@ The active system is the React application in the repository root and the Expres
 
 Both Vercel projects are linked to [LAP777-hub/SCCPMS](https://github.com/LAP777-hub/SCCPMS), production branch `main`: **sccpms** at `https://sccpms.vercel.app`, and **sccpms-api** at `https://sccpms-api.vercel.app`. Their production settings and separate environment variables are configured in Vercel. The frontend has three public variables; the API has fifteen private/runtime variables. Environment values remain outside Git. Deployment checks and failures are recorded in [the testing report](TESTING_REPORT.md).
 
+Both production deployments are READY. Live checks verify frontend assets/routing,
+API/database health 200, production CORS and protected GET/POST rejection. GitHub
+CI passes 79/79 browser cases plus backend/security jobs. Supabase Site URL and
+signup/invite/recovery redirects now target the production frontend; previous
+local callback URLs remain allowed. University email delivery still requires
+the sender-domain DNS and SMTP/inbox acceptance described below.
+
 ## Repository and project settings
 
 | Setting | Frontend: sccpms | Backend: sccpms-api |
