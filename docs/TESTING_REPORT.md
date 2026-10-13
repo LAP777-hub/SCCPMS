@@ -817,6 +817,37 @@ are configured separately. School-domain verification and received university
 mail remain separate live acceptance gates. Generated artifacts are local and
 excluded from Git. Deployment URLs/acceptance are recorded after publication.
 
+## 11d. GitHub publication and first cloud builds
+
+Source was published to [LAP777-hub/SCCPMS](https://github.com/LAP777-hub/SCCPMS)
+on `main`. Remote README changes were merged without rewriting history, retaining
+the team-members table. The first push was rejected because new remote commits
+arrived during preparation; merging those commits allowed the next push to
+succeed. Commit `a55cf2b` triggered both Git-connected Vercel projects.
+
+The frontend uses the repository root; the API uses `server`. Both use Node 22.
+Three frontend and fifteen API production variables were stored through Vercel's
+standard environment commands. Read-back confirmed the key names, production
+scope and sensitive storage; private values were not logged or committed. An
+earlier combined temporary-credential-file command was rejected by automatic
+approval review and did not run. The standard environment commands completed
+the configuration successfully.
+
+| Check/attempt | Result and correction |
+| --- | --- |
+| First frontend Vercel build | Failed during `npm ci`: the lockfile's optional WASM dependency graph lacked bundled emnapi metadata. Reproduced under Node 22/npm 10 in an empty install directory |
+| Frontend lock repair | Added two missing bundled emnapi entries; preserved all 233 existing package versions. Clean Linux x64/glibc-target install passed with 186 packages; native cloud build still supplies actual Linux execution |
+| First API Vercel build | Dependency install and `tsc` passed, then Vercel's compiler rejected Helmet's default import as non-callable |
+| Helmet correction | Namespace import with explicit `.default` preserves middleware options. Node 22 typecheck, ESM/CommonJS runtime creation and alternate TypeScript module-resolution checks passed |
+| First GitHub workflow | Security job passed. Frontend install failed on the same lockfile. Four of five real database cases passed; the workflow case failed because vanilla CI PostgreSQL has no Supabase `auth.audit_log_entries` table |
+| Database fixture isolation | Added a private Auth-audit fixture and actual UNION/filter/pagination assertions. Socket failures still fail the test; a separate cleanup connection releases clients and removes only the temporary schema. Node 22 typecheck passed |
+| Focused local workflow rerun | Auth-audit assertions passed, then the university connection reset during scheduling SQL. The run failed with `ECONNRESET`; retained as a network failure, with a full CI rerun required |
+| Real Vercel database integration | Both concurrency/permissions and late-commit invalidation cases passed against isolated temporary schemas: 2/2, zero skips/failures, 28.35s; cleanup completed |
+
+Cloud rebuild, HTTP/database health, deployed browser checks and production Auth
+redirect results are recorded after these corrections. University-domain DNS and
+actual received OTP/invitation mail remain separate acceptance requirements.
+
 ## 12. Supporting documents
 
 - [Operations](../OPERATIONS.md)

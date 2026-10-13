@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
+import * as helmetPackage from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { config } from './config.js';
 import { pool } from './db.js';
@@ -32,7 +32,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', config.TRUST_PROXY);
 
 // Enhanced security headers with Helmet
-app.use(helmet({
+app.use(helmetPackage.default({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],

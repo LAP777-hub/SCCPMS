@@ -2,7 +2,7 @@
 
 The active system is the React application in the repository root and the Express API in `server/`. Import the same GitHub repository into two Vercel projects. Vercel supports a separate project for each application directory. [Vercel monorepo imports](https://vercel.com/docs/monorepos#add-a-monorepo-through-the-vercel-dashboard).
 
-The existing frontend project is **sccpms**, at `https://sccpms.vercel.app`. Reuse it and correct its settings below. The separate **sccpms-api** project is created and linked to the same repository, with assigned production origin `https://sccpms-api.vercel.app`. Production environment settings are being configured separately from Git; deployment and live email acceptance are verified after publication.
+Both Vercel projects are linked to [LAP777-hub/SCCPMS](https://github.com/LAP777-hub/SCCPMS), production branch `main`: **sccpms** at `https://sccpms.vercel.app`, and **sccpms-api** at `https://sccpms-api.vercel.app`. Their production settings and separate environment variables are configured in Vercel. The frontend has three public variables; the API has fifteen private/runtime variables. Environment values remain outside Git. Deployment checks and failures are recorded in [the testing report](TESTING_REPORT.md).
 
 ## Repository and project settings
 

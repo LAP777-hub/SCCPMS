@@ -2,7 +2,8 @@
 
 The active application is the root `src/` React frontend and `server/` Express
 API. Supabase Auth, profiles and PostgreSQL clinic records must use the same
-project. The separate `frontend/` and `backend/` directories are older applications.
+project. The older applications are preserved in `legacy/frontend/` and
+`legacy/backend/`; supplied screen designs are in `design-references/`.
 
 ## Start locally
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { mock, test } from 'node:test';
+import pg from 'pg';
 import type { Request, Response, Router } from 'express';
 import { pool } from '../src/db.js';
 import api from '../src/api.routes.js';
@@ -61,11 +62,22 @@ test(
     const realConnect = pool.connect.bind(pool);
     const db = await realConnect();
     const other = await realConnect();
+    const cleanup = new pg.Pool({ ...pool.options, max: 1 });
+    let created = false;
+    let connectionFailure: Error | undefined;
+    const captureConnectionFailure = (error: Error) => { connectionFailure ??= error; };
+    db.on('error', captureConnectionFailure);
+    other.on('error', captureConnectionFailure);
     const rawDbQuery = db.query.bind(db),
       rawOtherQuery = other.query.bind(other);
     const setLocal = `SET LOCAL search_path TO "${schema}", public`;
+    let isolatedAuthAuditReads = 0;
+    const isolatedProviderSql = (sql: string) => sql.replace(/\bauth\.audit_log_entries\b/g, () => {
+      isolatedAuthAuditReads += 1;
+      return `"${schema}"."auth_audit_log_entries"`;
+    });
     const routeQuery = async (sql: string, parameters?: unknown[]) => {
-      const result = await rawDbQuery(sql, parameters);
+      const result = await rawDbQuery(isolatedProviderSql(sql), parameters);
       if (sql.trim().toUpperCase() === 'BEGIN') await rawDbQuery(setLocal);
       return result;
     };
@@ -73,7 +85,7 @@ test(
       await rawDbQuery('BEGIN');
       await rawDbQuery(setLocal);
       try {
-        const result = await rawDbQuery(sql, parameters);
+        const result = await rawDbQuery(isolatedProviderSql(sql), parameters);
         await rawDbQuery('COMMIT');
         return result;
       } catch (error) {
@@ -95,6 +107,7 @@ test(
       nextEnds = `${day}T08:30:00.000Z`;
     try {
       await rawDbQuery(`CREATE SCHEMA "${schema}"`);
+      created = true;
       await rawDbQuery('BEGIN');
       await rawDbQuery(setLocal);
       for (const file of [
@@ -115,6 +128,11 @@ test(
       ]) {
         await rawDbQuery(await readFile(new URL(`../sql/${file}`, import.meta.url), 'utf8'));
       }
+      // Plain PostgreSQL in CI has no hosted Auth schema. Keep the Auth audit
+      // UNION real SQL while routing it to fixture rows in this private schema.
+      await rawDbQuery(`CREATE TABLE auth_audit_log_entries (
+        id uuid PRIMARY KEY, payload jsonb NOT NULL, created_at timestamptz NOT NULL
+      )`);
       await rawDbQuery(
         'INSERT INTO clinic_doctors (id,user_id,full_name,specialty) VALUES ($1,$2,$3,$4),($5,$6,$7,$4)',
         [
@@ -171,12 +189,31 @@ test(
 
       const sameTimeIds=[randomUUID(),randomUUID()].sort().reverse();
       await dbQuery("INSERT INTO audit_events(id,actor_user_id,action,entity_type,created_at) VALUES ($1,$3,'test.first','test','2030-01-01T00:00:00.123456Z'),($2,$3,'test.second','test','2030-01-01T00:00:00.123456Z')",[...sameTimeIds,adminId]);
+      const authAuditId = randomUUID(), malformedActorAuditId = randomUUID(), accessAuditId = randomUUID();
+      await dbQuery("INSERT INTO auth_audit_log_entries(id,payload,created_at) VALUES ($1,$2::jsonb,'2029-01-02T00:00:00Z'),($3,$4::jsonb,'2029-01-01T00:00:00Z')",
+        [authAuditId,JSON.stringify({actor_id:adminId,action:'login'}),malformedActorAuditId,JSON.stringify({actor_id:'invalid-fixture-id',action:'logout'})]);
+      await dbQuery("INSERT INTO request_audit_logs(id,actor_user_id,method,path,status_code,duration_ms,created_at) VALUES ($1,$2,'GET','/api/fixture-records',200,1,'2028-01-01T00:00:00Z')",[accessAuditId,adminId]);
       const firstPage=await call(api,'get','/audit-events','admin',adminId,{}, {},{limit:'1'});
       assert.equal(firstPage.status,200,JSON.stringify(firstPage.body));
       assert.equal(firstPage.body.data[0].id,sameTimeIds[0]);
       const nextPage=await call(api,'get','/audit-events','admin',adminId,{}, {},{limit:'1',before:firstPage.body.before,beforeId:firstPage.body.beforeId});
       assert.equal(nextPage.status,200,JSON.stringify(nextPage.body));
       assert.equal(nextPage.body.data[0].id,sameTimeIds[1],'audit pagination preserves rows with identical timestamps');
+      const authPage=await call(api,'get','/audit-events','admin',adminId,{}, {},{limit:'1',before:nextPage.body.before,beforeId:nextPage.body.beforeId});
+      assert.equal(authPage.status,200,JSON.stringify(authPage.body));
+      assert.equal(authPage.body.data[0].id,authAuditId);
+      assert.equal(authPage.body.data[0].actor_user_id,adminId);
+      assert.equal(authPage.body.data[0].action,'auth.login');
+      assert.equal(authPage.body.data[0].entity_type,'auth_session');
+      const allAudit=await call(api,'get','/audit-events','admin',adminId,{}, {},{kind:'all'});
+      assert.equal(allAudit.status,200,JSON.stringify(allAudit.body));
+      assert.equal(allAudit.body.data.find((row: {id:string})=>row.id===malformedActorAuditId).actor_user_id,null,'malformed provider actor IDs cannot break the audit UNION');
+      assert.ok(allAudit.body.data.some((row: {id:string})=>row.id===accessAuditId));
+      const accessAudit=await call(api,'get','/audit-events','admin',adminId,{}, {},{kind:'access'});
+      assert.equal(accessAudit.status,200,JSON.stringify(accessAudit.body));
+      assert.deepEqual(accessAudit.body.data.map((row: {id:string})=>row.id),[accessAuditId],'access filtering excludes clinical and provider-auth audit rows');
+      assert.equal(accessAudit.body.data[0].action,'GET /api/fixture-records (200)');
+      assert.equal(isolatedAuthAuditReads,5,'all audit queries read private Auth fixtures instead of a hosted Auth table');
       mock.method(globalThis, 'fetch', async (input: RequestInfo | URL) => {
         const url = new URL(
           typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -840,10 +877,19 @@ test(
       mock.restoreAll();
       await rawDbQuery('ROLLBACK').catch(() => undefined);
       await rawOtherQuery('ROLLBACK').catch(() => undefined);
-      await rawDbQuery(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
-      db.release();
-      other.release();
-      await pool.end();
+      db.release(connectionFailure);
+      other.release(connectionFailure);
+      try {
+        // Cleanup uses a fresh connection if a long-lived fixture socket died.
+        // A failed connection remains a test failure; it cannot skip assertions.
+        if (created) {
+          await cleanup.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+          assert.equal((await cleanup.query('SELECT count(*)::int AS count FROM pg_namespace WHERE nspname=$1',[schema])).rows[0].count,0);
+        }
+      } finally {
+        await cleanup.end();
+        await pool.end();
+      }
     }
   }
 );
