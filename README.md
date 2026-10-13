@@ -134,3 +134,12 @@ Build before browser tests, which use the local Vite preview. Browser regression
 The frontend build creates `dist/`. Vercel imports the frontend from the repository root and the API from `server`; do not import `legacy/frontend` or `legacy/backend` for this system. The deployment guide lists the exact public/private environment settings, production Auth callback URLs, custom SMTP and TLS requirements.
 
 For current operating procedures and remaining external requirements, see [OPERATIONS.md](OPERATIONS.md) and [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md). The archived README in `legacy/` records the older project instructions; the commands and deployment roots above describe the active application.
+
+## Team Members and Responsibilities
+
+| Team Member | Role | Responsibilities |
+|---|---|---|
+| Lucky Albert Pinga | Backend Developer | Supabase database, authentication, and backend functionality. |
+| Lucky Malegole Seloane | Frontend Developer | User interface, responsive design, and frontend integration. |
+| Lungelo Mjuleka | Tester | System testing, bug reporting, and quality assurance. |
+| Katleho Pitikoe | System Architect & Documentation | System requirements, architecture, technical specifications, and documentation. |
