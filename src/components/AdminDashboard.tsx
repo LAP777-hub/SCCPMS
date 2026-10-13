@@ -1,159 +1,119 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import {
-  Activity, Bell, Calendar, CalendarCheck, FileText, LayoutDashboard,
-  LogOut, Menu, Plus, ShieldCheck, Stethoscope, Users, X,
-} from 'lucide-react';
+import AuditLog from './admin/AuditLog';
+import ClinicClosures from './admin/ClinicClosures';
+import AppointmentActivity from './admin/AppointmentActivity';
+import type { ClinicAnalytics } from '../lib/analytics';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Activity, Bell, Calendar, CalendarCheck, FileText, LayoutDashboard, LogOut, Menu, Plus, Stethoscope, Users, X } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { apiRequest } from '../lib/api';
+import { clinicDate, clinicTimeToIso, formatClinicDate } from '../lib/clinic-time';
+import { useLiveRefresh } from '../lib/useClinicRefresh';
 import StaffRegistrationModal from './admin/StaffRegistrationModal';
+import SidebarBrand from './SidebarBrand';
+import { AppointmentsView, PatientsView, NotificationsView, RefreshButton, type ClinicAppointment, type ClinicDoctor, type ClinicNotification, type ClinicPatient, type ClinicStaff } from './admin/ClinicOperations';
 
-type AdminSection = 'overview' | 'doctors' | 'patients' | 'appointments' | 'schedule' | 'reports' | 'leave' | 'logs';
-type Doctor = { id: string; user_id: string; full_name: string; specialty: string; department: string | null; active: boolean };
-type Patient = { id: string; email: string; full_name: string | null; phone: string | null; user_type: string | null; student_number: string | null; staff_number: string | null; department: string | null; program: string | null; created_at: string };
-type Appointment = { id: string; patient_user_id: string; patient_name: string; doctor_name: string; specialty: string; consultation_type: string; starts_at: string; mode: string; status: string };
+type AdminSection = 'overview' | 'staff' | 'patients' | 'appointments' | 'schedule' | 'reports' | 'leave' | 'logs' | 'notifications';
 type AuditEvent = { id: string; actor_user_id: string; action: string; entity_type: string; entity_id: string | null; created_at: string };
 type LeaveRequest = { id: string; doctor_user_id: string; starts_on: string; ends_on: string; leave_type: string; reason: string; status: string; review_note: string | null };
-type AdminData = { doctors: Doctor[]; patients: Patient[]; appointments: Appointment[]; auditEvents: AuditEvent[]; leaveRequests: LeaveRequest[] };
-
+type Settings = { timezone: string; opens_at: string; closes_at: string; default_appointment_minutes: number; minimum_reschedule_notice_hours: number };
+type AdminData = { doctors: ClinicDoctor[]; staff: ClinicStaff[]; patients: ClinicPatient[]; appointments: ClinicAppointment[]; auditEvents: AuditEvent[]; leaveRequests: LeaveRequest[]; notifications: ClinicNotification[]; settings: Settings | null; analytics: ClinicAnalytics | null };
 const navItems: { id: AdminSection; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'doctors', label: 'Doctors', icon: Stethoscope },
-  { id: 'patients', label: 'Patients', icon: Users },
-  { id: 'appointments', label: 'Appointments', icon: Calendar },
-  { id: 'schedule', label: 'Doctor Availability', icon: Calendar },
-  { id: 'reports', label: 'Reports', icon: Activity },
-  { id: 'leave', label: 'Leave Requests', icon: Calendar },
-  { id: 'logs', label: 'Audit Log', icon: FileText },
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard }, { id: 'staff', label: 'Doctors & Staff', icon: Stethoscope },
+  { id: 'patients', label: 'Patients', icon: Users }, { id: 'appointments', label: 'Appointments', icon: Calendar },
+  { id: 'schedule', label: 'Availability & Settings', icon: CalendarCheck }, { id: 'reports', label: 'Reports', icon: Activity },
+  { id: 'leave', label: 'Leave Requests', icon: Calendar }, { id: 'logs', label: 'Audit Log', icon: FileText }, { id: 'notifications', label: 'Notifications', icon: Bell },
 ];
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Unable to save this change.';
 
-async function loadAdminData(): Promise<AdminData> {
-  const [doctors, patients, appointments, auditEvents, leaveRequests] = await Promise.all([
-    apiRequest<{ data: Doctor[] }>('/api/doctors'),
-    apiRequest<{ data: Patient[] }>('/api/patients'),
-    apiRequest<{ data: Appointment[] }>('/api/appointments'),
-    apiRequest<{ data: AuditEvent[] }>('/api/audit-events'),
-    apiRequest<{ data: LeaveRequest[] }>('/api/leave-requests'),
-  ]);
-  return { doctors: doctors.data, patients: patients.data, appointments: appointments.data, auditEvents: auditEvents.data, leaveRequests: leaveRequests.data };
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <tr><td colSpan={8} className="admin-empty-state">{children}</td></tr>;
-}
-
-function Table({ children }: { children: React.ReactNode }) {
-  return <div className="admin-table-wrap"><table className="admin-table">{children}</table></div>;
-}
-
-function ScheduleAdminView({ doctors, onSaved }: { doctors: Doctor[]; onSaved: () => void }) {
-  const [doctorId, setDoctorId] = useState('');
-  const [date, setDate] = useState('');
-  const [startTime, setStartTime] = useState('08:00');
-  const [slots, setSlots] = useState<Array<{ id: string; starts_at: string; ends_at: string }>>([]);
-  const [hours, setHours] = useState({ timezone: 'Africa/Johannesburg', opens_at: '08:00', closes_at: '17:15', default_appointment_minutes: 30, maximum_reschedules_per_day: 2 });
+function StaffView({ staff, onSaved, onInvite }: { staff: ClinicStaff[]; onSaved: () => Promise<void>; onInvite: (role: 'doctor' | 'receptionist') => void }) {
+  const [editing, setEditing] = useState<ClinicStaff | null>(null);
+  const [deactivating, setDeactivating] = useState<ClinicStaff | null>(null);
+  const [form, setForm] = useState({ fullName: '', phone: '', department: '', specialty: '' });
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    void apiRequest<{ data: typeof hours }>('/api/clinic/settings').then((result) => setHours({
-      timezone: result.data.timezone,
-      opens_at: String(result.data.opens_at).slice(0, 5),
-      closes_at: String(result.data.closes_at).slice(0, 5),
-      default_appointment_minutes: result.data.default_appointment_minutes,
-      maximum_reschedules_per_day: result.data.maximum_reschedules_per_day,
-    })).catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Unable to load clinic settings.'));
-  }, []);
-
-  useEffect(() => {
-    if (!doctorId || !date) return;
-    let active = true;
-    apiRequest<{ data: typeof slots }>(`/api/doctors/${doctorId}/availability?date=${date}`)
-      .then((result) => { if (active) setSlots(result.data); })
-      .catch((requestError: unknown) => { if (active) setError(requestError instanceof Error ? requestError.message : 'Unable to load availability.'); });
-    return () => { active = false; };
-  }, [doctorId, date]);
-
-  async function addSlot(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('');
+  const [success, setSuccess] = useState('');
+  function edit(member: ClinicStaff) { setEditing(member); setError(''); setSuccess(''); setForm({ fullName: member.full_name || '', phone: member.phone || '', department: member.department || '', specialty: member.specialty || member.program || '' }); }
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!editing) return;
+    setBusy(true); setError(''); setSuccess('');
     try {
-      const startsAt = new Date(`${date}T${startTime}:00`);
-      const endsAt = new Date(startsAt.getTime() + 30 * 60_000);
-      await apiRequest('/api/availability-slots', { method: 'POST', body: JSON.stringify({ doctorId, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() }) });
-      const result = await apiRequest<{ data: typeof slots }>(`/api/doctors/${doctorId}/availability?date=${date}`);
-      setSlots(result.data);
-      onSaved();
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to add availability.');
-    }
+      await apiRequest(`/api/staff/${editing.id}`, { method: 'PATCH', body: JSON.stringify({ fullName: form.fullName, phone: form.phone.replace(/[\s()-]/g, ''), department: form.department || null, ...(editing.role === 'doctor' ? { specialty: form.specialty } : {}) }) });
+      setEditing(null); setSuccess('Staff details updated.'); await onSaved();
+    } catch (requestError) { setError(errorMessage(requestError)); } finally { setBusy(false); }
   }
-
-  async function saveHours(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('');
-    try {
-      const result = await apiRequest<{ data: typeof hours }>('/api/clinic/settings', { method: 'PUT', body: JSON.stringify({ timezone: hours.timezone, opensAt: hours.opens_at, closesAt: hours.closes_at, defaultAppointmentMinutes: hours.default_appointment_minutes, maximumReschedulesPerDay: hours.maximum_reschedules_per_day }) });
-      setHours({ ...hours, ...result.data, opens_at: String(result.data.opens_at).slice(0, 5), closes_at: String(result.data.closes_at).slice(0, 5) });
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to save clinic settings.');
-    }
+  async function activate(member: ClinicStaff, active: boolean) {
+    setBusy(true); setError(''); setSuccess('');
+    try { await apiRequest(`/api/staff/${member.id}`, { method: active ? 'PATCH' : 'DELETE', ...(active ? { body: JSON.stringify({ active: true }) } : {}) }); setDeactivating(null); setSuccess(active ? 'Staff account reactivated.' : 'Staff account deactivated. Existing clinic records are retained.'); await onSaved(); } catch (requestError) { setError(errorMessage(requestError)); } finally { setBusy(false); }
   }
-
-  return <section className="admin-section"><div className="admin-section-heading"><div><h1>Doctor Availability</h1><p>Manage clinic hours and appointment slots.</p></div></div>
-    {error && <p className="admin-error" role="alert">{error}</p>}
-    <form className="admin-panel" onSubmit={saveHours}><h2>Clinic booking policy</h2><div className="admin-form-row">
-      <label>Timezone<input value={hours.timezone} onChange={(event) => setHours({ ...hours, timezone: event.target.value })} required /></label>
-      <label>Opens at<input type="time" value={hours.opens_at} onChange={(event) => setHours({ ...hours, opens_at: event.target.value })} required /></label>
-      <label>Closes at<input type="time" value={hours.closes_at} onChange={(event) => setHours({ ...hours, closes_at: event.target.value })} required /></label>
-      <label>Default duration (minutes)<input type="number" min="10" max="30" value={hours.default_appointment_minutes} onChange={(event) => setHours({ ...hours, default_appointment_minutes: Number(event.target.value) })} required /></label>
-      <label>Reschedules per account/day<input type="number" min="0" max="10" value={hours.maximum_reschedules_per_day} onChange={(event) => setHours({ ...hours, maximum_reschedules_per_day: Number(event.target.value) })} required /></label>
-    </div><button className="admin-primary-button">Save clinic policy</button></form>
-    <form className="admin-panel" onSubmit={addSlot}><h2>Add doctor slot</h2><div className="admin-form-row">
-      <label>Doctor<select value={doctorId} onChange={(event) => setDoctorId(event.target.value)} required><option value="">Choose doctor</option>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.full_name} · {doctor.specialty}</option>)}</select></label>
-      <label>Date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} required /></label>
-      <label>Start time<input type="time" step="1800" value={startTime} onChange={(event) => setStartTime(event.target.value)} required /></label>
-    </div><button className="admin-primary-button" type="submit" disabled={!doctorId || !date}>Add 30-minute slot</button>
-      {slots.length ? <Table><thead><tr><th>Start</th><th>End</th></tr></thead><tbody>{slots.map((slot) => <tr key={slot.id}><td>{new Date(slot.starts_at).toLocaleString()}</td><td>{new Date(slot.ends_at).toLocaleTimeString()}</td></tr>)}</tbody></Table> : doctorId && date ? <p>No available slots for this date.</p> : null}
-    </form>
+  async function setDirectoryActive(member: ClinicStaff, active: boolean) {
+    if (!member.doctor_id) return;
+    setBusy(true); setError(''); setSuccess('');
+    try { await apiRequest(`/api/doctors/${member.doctor_id}`, { method: active ? 'PATCH' : 'DELETE', ...(active ? { body: JSON.stringify({ active: true }) } : {}) }); setSuccess(active ? 'Doctor added to the booking directory.' : 'Doctor removed from the booking directory.'); await onSaved(); } catch (requestError) { setError(errorMessage(requestError)); } finally { setBusy(false); }
+  }
+  return <section className="clinic-ops"><div className="clinic-ops-heading"><div><h1>Doctors & Staff</h1><p>Invite staff and manage account access and the booking directory.</p></div><div className="clinic-ops-actions"><button className="primary" onClick={() => onInvite('doctor')}><Plus size={16} />Invite doctor</button><button onClick={() => onInvite('receptionist')}><Plus size={16} />Invite receptionist</button></div></div>
+    {error && <p className="clinic-ops-error" role="alert">{error}</p>}{success && <p className="clinic-ops-success" role="status">{success}</p>}
+    {editing && <form className="clinic-ops-form" onSubmit={save}><h2>Edit {editing.role}</h2><label>Full name<input required minLength={2} value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} /></label><label>Phone in international format<input type="tel" required pattern="\+[1-9][0-9]{7,14}" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label><label>Department<input value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} /></label>{editing.role === 'doctor' && <label>Specialty<input required minLength={2} value={form.specialty} onChange={(event) => setForm({ ...form, specialty: event.target.value })} /></label>}<div className="clinic-ops-actions clinic-ops-wide"><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button><button type="button" disabled={busy} onClick={() => setEditing(null)}>Cancel</button></div></form>}
+    {deactivating && <div className="clinic-ops-delete-confirm"><span>Deactivate {deactivating.full_name || deactivating.email}? This removes account access and booking availability.</span><div className="clinic-ops-actions"><button className="danger" disabled={busy} onClick={() => void activate(deactivating, false)}>Deactivate account</button><button disabled={busy} onClick={() => setDeactivating(null)}>Keep account</button></div></div>}
+    <div className="clinic-ops-table"><table><thead><tr><th>Staff member</th><th>Role & department</th><th>Contact</th><th>Account</th><th>Booking directory</th><th>Actions</th></tr></thead><tbody>{staff.map((member) => <tr key={member.id}><td>{member.full_name || member.email}<small>{member.email}</small></td><td>{member.role}<small>{member.specialty || member.department || 'Not recorded'}</small></td><td>{member.phone || 'Not recorded'}</td><td>{member.active === false ? 'Inactive' : 'Active'}</td><td>{member.role === 'doctor' ? member.doctor_active ? 'Available for booking' : 'Inactive' : '—'}</td><td><div className="clinic-ops-actions"><button disabled={busy} onClick={() => edit(member)}>Edit</button>{member.active === false ? <button disabled={busy} onClick={() => void activate(member, true)}>Reactivate</button> : <button className="danger" disabled={busy} onClick={() => setDeactivating(member)}>Deactivate</button>}{member.role === 'doctor' && member.doctor_id && member.active !== false && <button disabled={busy} onClick={() => void setDirectoryActive(member, !member.doctor_active)}>{member.doctor_active ? 'Remove from booking' : 'Enable booking'}</button>}</div></td></tr>)}{!staff.length && <tr><td colSpan={6} className="clinic-ops-empty">No doctors or receptionists have been invited.</td></tr>}</tbody></table></div>
   </section>;
 }
 
-function ReportSummary() {
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+function ScheduleAdminView({ doctors, settings, onSaved }: { doctors: ClinicDoctor[]; settings: Settings | null; onSaved: () => Promise<void> }) {
+  const [doctorId, setDoctorId] = useState('');
+  const [date, setDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [slots, setSlots] = useState<Array<{ id: string; starts_at: string; ends_at: string; status: string }>>([]);
+  const [hours, setHours] = useState<Settings | null>(settings);
+  const [duration, setDuration] = useState(settings?.default_appointment_minutes || 30);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [busy, setBusy] = useState(false);
+  const timezone = settings?.timezone || 'Africa/Johannesburg';
+  const slotSequence = useRef(0);
+  const [slotError, setSlotError] = useState('');
+  const loadSlots = useCallback(async () => {
+    const request = ++slotSequence.current;
+    if (!doctorId) { setSlots([]); return; }
+    try { const result = await apiRequest<{ data: typeof slots }>(`/api/availability-slots?doctorId=${doctorId}`); if (request === slotSequence.current) { setSlots(result.data.filter((slot) => !date || clinicDate(slot.starts_at, timezone) === date)); setSlotError(''); } } catch (requestError) { if (request === slotSequence.current) { setSlotError(errorMessage(requestError)); setSlots([]); } }
+  }, [doctorId, date, timezone]);
+  useLiveRefresh(loadSlots);
+  useEffect(() => {
+    setSlots([]); void loadSlots();
+  }, [loadSlots]);
+  async function addSlot(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError(''); setSuccess('');
+    try {
+      const startsAt = clinicTimeToIso(date, startTime, timezone);
+      const endsAt = new Date(new Date(startsAt).getTime() + duration * 60_000).toISOString();
+      await apiRequest('/api/availability-slots', { method: 'POST', body: JSON.stringify({ doctorId, startsAt, endsAt }) }); setSuccess('Availability slot created.'); await loadSlots(); await onSaved();
+    } catch (requestError) { setError(errorMessage(requestError)); } finally { setBusy(false); }
+  }
+  async function changeSlot(id: string, method: 'DELETE' | 'PATCH', status?: string) {
+    setBusy(true); setError(''); setSuccess('');
+    try { await apiRequest(`/api/availability-slots/${id}`, { method, ...(status ? { body: JSON.stringify({ status }) } : {}) }); setSuccess(method === 'DELETE' ? 'Availability slot deleted.' : `Availability slot ${status}.`); await loadSlots(); await onSaved(); } catch (requestError) { setError(errorMessage(requestError)); } finally { setBusy(false); }
+  }
+  async function saveHours(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!hours) return;
+    setBusy(true); setError(''); setSuccess('');
+    try {
+      const result = await apiRequest<{ data: Settings }>('/api/clinic/settings', { method: 'PUT', body: JSON.stringify({ timezone: hours.timezone, opensAt: String(hours.opens_at).slice(0, 5), closesAt: String(hours.closes_at).slice(0, 5), defaultAppointmentMinutes: hours.default_appointment_minutes, minimumRescheduleNoticeHours: hours.minimum_reschedule_notice_hours }) }); setHours(result.data); setSuccess('Clinic booking policy saved.'); await onSaved();
+    } catch (requestError) { setError(errorMessage(requestError)); } finally { setBusy(false); }
+  }
+  return <section className="clinic-ops"><div className="clinic-ops-heading"><div><h1>Availability & Clinic Settings</h1><p>Create bookable doctor times and configure clinic hours and booking policies.</p></div></div>{error && <p className="clinic-ops-error" role="alert">{error}</p>}{slotError && <p className="clinic-ops-error" role="alert">{slotError}</p>}{success && <p className="clinic-ops-success" role="status">{success}</p>}
+    {hours ? <form className="clinic-ops-form" onSubmit={saveHours}><h2>Clinic booking policy</h2><label>Timezone<input value={hours.timezone} onChange={(event) => setHours({ ...hours, timezone: event.target.value })} required /></label><label>Opens at<input type="time" value={String(hours.opens_at).slice(0, 5)} onChange={(event) => setHours({ ...hours, opens_at: event.target.value })} required /></label><label>Closes at<input type="time" value={String(hours.closes_at).slice(0, 5)} onChange={(event) => setHours({ ...hours, closes_at: event.target.value })} required /></label><label>Default duration (minutes)<input type="number" min={10} max={30} value={hours.default_appointment_minutes} onChange={(event) => setHours({ ...hours, default_appointment_minutes: Number(event.target.value) })} required /></label><label>Reschedule notice (hours)<input type="number" min={0} max={168} value={hours.minimum_reschedule_notice_hours} onChange={(event) => setHours({ ...hours, minimum_reschedule_notice_hours: Number(event.target.value) })} required /></label><div className="clinic-ops-actions clinic-ops-wide"><button className="primary" disabled={busy}>Save clinic policy</button></div></form> : <p className="clinic-ops-error">Clinic settings could not be loaded. Refresh before creating availability.</p>}
+    <form className="clinic-ops-form" onSubmit={addSlot}><h2>Doctor availability</h2><p className="clinic-ops-wide clinic-ops-muted">Dates and times use the saved clinic timezone: {timezone}.</p><label>Doctor<select value={doctorId} onChange={(event) => setDoctorId(event.target.value)} required><option value="">Choose doctor</option>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.full_name} · {doctor.specialty}</option>)}</select></label><label>Date<input type="date" min={clinicDate(new Date(), timezone)} value={date} onChange={(event) => setDate(event.target.value)} required /></label><label>Start time<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} required /></label><label>Duration (minutes)<input type="number" min={10} max={30} required value={duration} onChange={(event) => setDuration(Number(event.target.value))} /></label><div className="clinic-ops-actions clinic-ops-wide"><button className="primary" type="submit" disabled={busy || !doctorId || !date || !settings}>Create slot</button><button type="button" disabled={busy || !doctorId} onClick={() => void loadSlots()}>Refresh slots</button></div></form>
+    {doctorId && <div className="clinic-ops-table"><table><thead><tr><th>Start</th><th>End</th><th>Status</th><th>Actions</th></tr></thead><tbody>{slots.map((slot) => <tr key={slot.id}><td>{formatClinicDate(slot.starts_at, timezone)}</td><td>{formatClinicDate(slot.ends_at, timezone)}</td><td>{slot.status}</td><td><div className="clinic-ops-actions">{slot.status === 'available' && <><button disabled={busy} onClick={() => void changeSlot(slot.id, 'PATCH', 'blocked')}>Block booking</button><button className="danger" disabled={busy} onClick={() => void changeSlot(slot.id, 'DELETE')}>Delete</button></>}{slot.status === 'blocked' && <button disabled={busy} onClick={() => void changeSlot(slot.id, 'PATCH', 'available')}>Reopen booking</button>}</div></td></tr>)}{!slots.length && <tr><td colSpan={4} className="clinic-ops-empty">No availability slots for the selected doctor and date.</td></tr>}</tbody></table></div>}
+  </section>;
+}
+
+function ReportSummary({ timezone }: { timezone: string }) {
+  const [from, setFrom] = useState(clinicDate(new Date(Date.now() - 30 * 24 * 60 * 60_000), timezone));
+  const [to, setTo] = useState(clinicDate(new Date(), timezone));
   const [summary, setSummary] = useState<{ appointments: number; completed: number; cancelled: number; no_show: number } | null>(null);
   const [error, setError] = useState('');
-
-  async function load(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-    setError('');
-    const params = new URLSearchParams();
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
-    try {
-      const result = await apiRequest<{ data: typeof summary }>(`/api/reports/summary${params.size ? `?${params}` : ''}`);
-      setSummary(result.data);
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to load report.');
-    }
-  }
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
-    apiRequest<{ data: NonNullable<typeof summary> }>(`/api/reports/summary${params.size ? `?${params}` : ''}`)
-      .then((result) => setSummary(result.data))
-      .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : 'Unable to load report.'));
-  }, [from, to]);
-
-  return <div><form className="admin-panel" onSubmit={(event) => void load(event)}><div className="admin-form-row"><label>From<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label>To<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label></div><button className="admin-primary-button">Run report</button></form>
-    {error && <p className="admin-error" role="alert">{error}</p>}
-    {summary && <div className="admin-stats-grid"><div className="admin-stat-card"><span>Appointments</span><strong>{summary.appointments}</strong></div><div className="admin-stat-card"><span>Completed</span><strong>{summary.completed}</strong></div><div className="admin-stat-card"><span>Cancelled</span><strong>{summary.cancelled}</strong></div><div className="admin-stat-card"><span>No-show</span><strong>{summary.no_show}</strong></div></div>}
-  </div>;
+  async function load() { try { const params = new URLSearchParams({ from, to }); const result = await apiRequest<{ data: NonNullable<typeof summary> }>(`/api/reports/summary?${params}`); setSummary(result.data); setError(''); } catch (requestError) { setError(errorMessage(requestError)); } }
+  useLiveRefresh(load);
+  return <section className="clinic-ops"><div className="clinic-ops-heading"><div><h1>Operational Reports</h1><p>Recorded appointment activity by date. Clinic timezone: {timezone}.</p></div></div><form className="clinic-ops-form" onSubmit={(event) => { event.preventDefault(); void load(); }}><label>From<input required type="date" max={to} value={from} onChange={(event) => setFrom(event.target.value)} /></label><label>To<input required type="date" min={from} value={to} onChange={(event) => setTo(event.target.value)} /></label><div className="clinic-ops-actions clinic-ops-wide"><button className="primary">Run report</button></div></form>{error && <p className="clinic-ops-error" role="alert">{error}</p>}{summary && <div className="admin-stats-grid">{Object.entries(summary).map(([label, value]) => <div className="admin-stat-card" key={label}><span>{label.replace(/_/g, ' ')}</span><strong>{value}</strong></div>)}</div>}</section>;
 }
 
 export default function AdminDashboard() {
@@ -162,124 +122,41 @@ export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [staffRole, setStaffRole] = useState<'doctor' | 'receptionist'>('doctor');
   const [staffModalOpen, setStaffModalOpen] = useState(false);
-  const [data, setData] = useState<AdminData>({ doctors: [], patients: [], appointments: [], auditEvents: [], leaveRequests: [] });
+  const [data, setData] = useState<AdminData>({ doctors: [], staff: [], patients: [], appointments: [], auditEvents: [], leaveRequests: [], notifications: [], settings: null, analytics: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
+  const [actionError, setActionError] = useState('');
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const refreshSequence = useRef(0);
   async function refresh() {
+    const request = ++refreshSequence.current;
     try {
-      setError('');
-      setData(await loadAdminData());
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to load administration data.');
-    } finally {
-      setLoading(false);
-    }
+      const [doctors, staff, patients, appointments, auditEvents, leaveRequests, notifications, settings, analytics] = await Promise.all([
+        apiRequest<{ data: ClinicDoctor[] }>('/api/doctors'), apiRequest<{ data: ClinicStaff[] }>('/api/staff'), apiRequest<{ data: ClinicPatient[] }>('/api/patients'), apiRequest<{ data: ClinicAppointment[] }>('/api/appointments'), apiRequest<{ data: AuditEvent[] }>('/api/audit-events'), apiRequest<{ data: LeaveRequest[] }>('/api/leave-requests'), apiRequest<{ data: ClinicNotification[] }>('/api/notifications'), apiRequest<{ data: Settings }>('/api/clinic/settings'), apiRequest<{ data: ClinicAnalytics }>('/api/analytics'),
+      ]);
+      if (request === refreshSequence.current) { setData({ doctors: doctors.data, staff: staff.data, patients: patients.data, appointments: appointments.data, auditEvents: auditEvents.data, leaveRequests: leaveRequests.data, notifications: notifications.data, settings: settings.data, analytics: analytics.data }); setError(''); setLastUpdated(new Date()); }
+    } catch (requestError) { if (request === refreshSequence.current) setError(errorMessage(requestError)); } finally { if (request === refreshSequence.current) setLoading(false); }
   }
-
-  useEffect(() => { void refresh(); }, []);
-
-  const changeSection = (next: AdminSection) => {
-    setSection(next);
-    setSidebarOpen(false);
-  };
-  const openStaffRegistration = (role: 'doctor' | 'receptionist') => {
-    setStaffRole(role);
-    setStaffModalOpen(true);
-  };
-
-  const renderDoctors = () => <section className="admin-section">
-    <div className="admin-section-heading"><div><h1>Doctors</h1><p>Active practitioners in the clinic directory.</p></div><div className="admin-heading-actions">
-      <button className="admin-primary-button" onClick={() => openStaffRegistration('doctor')}><Plus size={16} />Add Doctor</button>
-      <button className="admin-secondary-button" onClick={() => openStaffRegistration('receptionist')}><Plus size={16} />Add Receptionist</button>
-    </div></div>
-    <Table><thead><tr><th>Name</th><th>Specialty</th><th>Department</th><th>Account ID</th></tr></thead><tbody>
-      {data.doctors.map((doctor) => <tr key={doctor.id}><td>{doctor.full_name}</td><td>{doctor.specialty}</td><td>{doctor.department || 'Not provided'}</td><td>{doctor.id}</td></tr>)}
-      {!data.doctors.length && <Empty>No doctors have been provisioned yet.</Empty>}
-    </tbody></Table>
-  </section>;
-
-  const renderPatients = () => <section className="admin-section">
-    <div className="admin-section-heading"><div><h1>Patients</h1><p>Patient accounts currently registered in the system.</p></div></div>
-    <Table><thead><tr><th>Name</th><th>Type</th><th>Email</th><th>Phone</th><th>University ID</th><th>Department / Program</th></tr></thead><tbody>
-      {data.patients.map((patient) => <tr key={patient.id}><td>{patient.full_name || 'Name not provided'}</td><td>{patient.user_type || 'Not provided'}</td><td>{patient.email}</td><td>{patient.phone || 'Not provided'}</td><td>{patient.student_number || patient.staff_number || 'Not provided'}</td><td>{patient.department || patient.program || 'Not provided'}</td></tr>)}
-      {!data.patients.length && <Empty>No patient accounts have been registered.</Empty>}
-    </tbody></Table>
-  </section>;
-
-  const renderAppointments = () => <section className="admin-section">
-    <div className="admin-section-heading"><div><h1>Appointments</h1><p>Appointment requests and visits recorded by the clinic.</p></div></div>
-    <Table><thead><tr><th>Patient</th><th>Doctor</th><th>Specialty</th><th>Consultation</th><th>Start</th><th>Mode</th><th>Status</th></tr></thead><tbody>
-      {data.appointments.map((appointment) => <tr key={appointment.id}><td>{appointment.patient_name}</td><td>{appointment.doctor_name}</td><td>{appointment.specialty}</td><td>{appointment.consultation_type}</td><td>{formatDate(appointment.starts_at)}</td><td>{appointment.mode === 'in_person' ? 'In person' : 'Telehealth'}</td><td><span className={`admin-status-pill ${appointment.status.replace(/_/g, '-')}`}>{appointment.status.replace(/_/g, ' ')}</span></td></tr>)}
-      {!data.appointments.length && <Empty>No appointments have been recorded.</Empty>}
-    </tbody></Table>
-  </section>;
-
-  const renderLogs = () => <section className="admin-section">
-    <div className="admin-section-heading"><div><h1>Audit Log</h1><p>Recorded account and appointment actions.</p></div></div>
-    <Table><thead><tr><th>Time</th><th>Actor account</th><th>Action</th><th>Record type</th><th>Record ID</th></tr></thead><tbody>
-      {data.auditEvents.map((event) => <tr key={event.id}><td>{formatDate(event.created_at)}</td><td>{event.actor_user_id}</td><td>{event.action}</td><td>{event.entity_type}</td><td>{event.entity_id || '—'}</td></tr>)}
-      {!data.auditEvents.length && <Empty>No audit events have been recorded.</Empty>}
-    </tbody></Table>
-  </section>;
-
+  useLiveRefresh(refresh);
+  const timezone = data.settings?.timezone || 'Africa/Johannesburg';
+  const changeSection = (next: AdminSection) => { setSection(next); setSidebarOpen(false); setActionError(''); };
+  const invite = (role: 'doctor' | 'receptionist') => { setStaffRole(role); setStaffModalOpen(true); };
+  const accountNames = new Map([...data.staff.map((member) => [member.id, member.full_name || member.email] as const), ...data.patients.map((patient) => [patient.id, patient.full_name || patient.email] as const), ...(profile ? [[profile.id, profile.full_name || profile.email] as const] : [])]);
   async function decideLeave(id: string, status: 'approved' | 'rejected') {
-    try {
-      await apiRequest(`/api/leave-requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-      await refresh();
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to update leave request.');
-    }
+    setLeaveBusy(true); setActionError('');
+    try { await apiRequest(`/api/leave-requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reviewNote: reviewNotes[id] || null }) }); await refresh(); } catch (requestError) { setActionError(errorMessage(requestError)); } finally { setLeaveBusy(false); }
   }
-
-  const renderLeaveRequests = () => <section className="admin-section">
-    <div className="admin-section-heading"><div><h1>Leave Requests</h1><p>Review doctor leave requests.</p></div></div>
-    <Table><thead><tr><th>Doctor account</th><th>Type</th><th>Dates</th><th>Reason</th><th>Status</th><th>Decision</th></tr></thead><tbody>
-      {data.leaveRequests.map((request) => <tr key={request.id}><td>{request.doctor_user_id}</td><td>{request.leave_type}</td><td>{request.starts_on} to {request.ends_on}</td><td>{request.reason}</td><td>{request.status}</td><td>{request.status === 'pending' && <><button className="admin-primary-button" onClick={() => void decideLeave(request.id, 'approved')}>Approve</button><button className="admin-secondary-button" onClick={() => void decideLeave(request.id, 'rejected')}>Reject</button></>}</td></tr>)}
-      {!data.leaveRequests.length && <Empty>No leave requests have been submitted.</Empty>}
-    </tbody></Table>
-  </section>;
-
-  const renderReports = () => <section className="admin-section"><div className="admin-section-heading"><div><h1>Operational Reports</h1><p>Aggregate appointment activity for the selected period.</p></div></div><ReportSummary /></section>;
-
-  const renderOverview = () => <section className="admin-section">
-    <div className="admin-section-heading"><div><h1>Clinic Overview</h1><p>Current operational records from the clinic database.</p></div></div>
-    <div className="admin-stats-grid">
-      <div className="admin-stat-card"><Users size={21} /><span>Patients</span><strong>{data.patients.length}</strong></div>
-      <div className="admin-stat-card"><Stethoscope size={21} /><span>Doctors</span><strong>{data.doctors.length}</strong></div>
-      <div className="admin-stat-card"><CalendarCheck size={21} /><span>Appointments</span><strong>{data.appointments.length}</strong></div>
-      <div className="admin-stat-card"><Activity size={21} /><span>Audit events</span><strong>{data.auditEvents.length}</strong></div>
-    </div>
-    <div className="admin-panel"><div className="admin-panel-header"><h2><CalendarCheck size={18} />Recent Appointments</h2><button onClick={() => changeSection('appointments')}>View all</button></div>
-      <Table><thead><tr><th>Doctor</th><th>Consultation</th><th>Start</th><th>Status</th></tr></thead><tbody>
-        {data.appointments.slice(0, 8).map((appointment) => <tr key={appointment.id}><td>{appointment.doctor_name}</td><td>{appointment.consultation_type}</td><td>{formatDate(appointment.starts_at)}</td><td>{appointment.status.replace(/_/g, ' ')}</td></tr>)}
-        {!data.appointments.length && <Empty>No appointments have been recorded.</Empty>}
-      </tbody></Table>
-    </div>
-  </section>;
-
+  const leaveContent = <section className="clinic-ops"><div className="clinic-ops-heading"><div><h1>Leave Requests</h1><p>Review doctor leave and its effect on availability. Handle scheduled appointments before approval.</p></div></div><div className="clinic-ops-table"><table><thead><tr><th>Doctor</th><th>Type & dates</th><th>Reason</th><th>Status</th><th>Review</th></tr></thead><tbody>{data.leaveRequests.map((request) => <tr key={request.id}><td>{accountNames.get(request.doctor_user_id) || request.doctor_user_id}</td><td>{request.leave_type}<small>{request.starts_on.slice(0, 10)} to {request.ends_on.slice(0, 10)}</small></td><td>{request.reason}</td><td>{request.status}</td><td>{request.status === 'pending' ? <><label>Review note<textarea className="clinic-ops-select" maxLength={2000} value={reviewNotes[request.id] || ''} onChange={(event) => setReviewNotes({ ...reviewNotes, [request.id]: event.target.value })} /></label><div className="clinic-ops-actions"><button className="primary" disabled={leaveBusy} onClick={() => void decideLeave(request.id, 'approved')}>Approve</button><button disabled={leaveBusy} onClick={() => void decideLeave(request.id, 'rejected')}>Reject</button></div></> : request.review_note || '—'}</td></tr>)}{!data.leaveRequests.length && <tr><td colSpan={5} className="clinic-ops-empty">No leave requests have been submitted.</td></tr>}</tbody></table></div></section>;
+  const logsContent = <AuditLog names={accountNames} timezone={timezone} />;
+  const today = clinicDate(new Date(), timezone);
+  const todayAppointments = data.appointments.filter((appointment) => clinicDate(appointment.starts_at, timezone) === today).sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+  const overview = <section className="clinic-ops"><div className="clinic-ops-heading"><div><h1>Clinic Overview</h1><p>Current records from the clinic database. Today: {today} ({timezone}).</p></div></div><div className="admin-stats-grid"><div className="admin-stat-card"><Users size={21} /><span>Active patients</span><strong>{data.analytics?.patients ?? 0}</strong></div><div className="admin-stat-card"><Stethoscope size={21} /><span>Active doctors</span><strong>{data.analytics?.doctors ?? 0}</strong></div><div className="admin-stat-card"><CalendarCheck size={21} /><span>Today's appointments</span><strong>{data.analytics?.appointmentsToday ?? 0}</strong></div><div className="admin-stat-card"><Activity size={21} /><span>Pending leave requests</span><strong>{data.analytics?.pendingLeaveRequests ?? 0}</strong></div><div className="admin-stat-card"><FileText size={21} /><span>Clinical visits</span><strong>{data.analytics?.clinicalVisits ?? 0}</strong></div><div className="admin-stat-card"><Users size={21} /><span>Active staff</span><strong>{data.analytics?.staff ?? 0}</strong></div></div><div className="clinic-ops-actions"><button onClick={() => changeSection('appointments')}>Manage appointments</button><button onClick={() => changeSection('patients')}>Register patient</button><button onClick={() => changeSection('schedule')}>Manage availability</button><button onClick={() => changeSection('leave')}>Review leave</button></div><div className="clinic-ops-table"><table><thead><tr><th>Today's patient</th><th>Doctor</th><th>Time</th><th>Status</th></tr></thead><tbody>{todayAppointments.map((appointment) => <tr key={appointment.id}><td>{appointment.patient_name}</td><td>{appointment.doctor_name}</td><td>{formatClinicDate(appointment.starts_at, timezone)}</td><td>{appointment.status.replace(/_/g, ' ')}</td></tr>)}{!todayAppointments.length && <tr><td colSpan={4} className="clinic-ops-empty">No appointments scheduled for today.</td></tr>}</tbody></table></div></section>;
+  const content = section === 'overview' ? <>{overview}<AppointmentActivity analytics={data.analytics} /></> : section === 'staff' ? <StaffView staff={data.staff} onSaved={refresh} onInvite={invite} /> : section === 'patients' ? <PatientsView patients={data.patients} admin onSaved={refresh} /> : section === 'appointments' ? <AppointmentsView appointments={data.appointments} doctors={data.doctors} patients={data.patients} timezone={timezone} onSaved={refresh} /> : section === 'schedule' ? <><ScheduleAdminView doctors={data.doctors} settings={data.settings} onSaved={refresh} /><ClinicClosures /></> : section === 'reports' ? <ReportSummary timezone={timezone} /> : section === 'leave' ? leaveContent : section === 'notifications' ? <NotificationsView notifications={data.notifications} onSaved={refresh} timezone={timezone} /> : logsContent;
   const activeItem = navItems.find((item) => item.id === section);
-  const content = section === 'overview' ? renderOverview() : section === 'doctors' ? renderDoctors() : section === 'patients' ? renderPatients() : section === 'appointments' ? renderAppointments() : section === 'schedule' ? <ScheduleAdminView doctors={data.doctors} onSaved={() => void refresh()} /> : section === 'reports' ? renderReports() : section === 'leave' ? renderLeaveRequests() : renderLogs();
-
-  return <div className="admin-shell">
-    <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
-      <div className="admin-sidebar-header"><span className="admin-sidebar-logo"><ShieldCheck size={25} /></span><div><strong>SCCPMS</strong><small>Administration</small></div></div>
-      <nav className="admin-nav">{navItems.map((item) => <button key={item.id} className={`admin-nav-item ${section === item.id ? 'active' : ''}`} onClick={() => changeSection(item.id)}><item.icon size={20} /><span>{item.label}</span></button>)}</nav>
-      <button className="admin-signout" onClick={signOut}><LogOut size={20} />Sign Out</button>
-    </aside>
-    {sidebarOpen && <div className="admin-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
-    <div className="admin-main">
-      <header className="admin-topbar"><button className="admin-menu-btn" onClick={() => setSidebarOpen((value) => !value)} aria-label="Toggle menu">{sidebarOpen ? <X size={22} /> : <Menu size={22} />}</button>
-        <div className="admin-topbar-title">{activeItem && <activeItem.icon size={20} />}<h2>{activeItem?.label}</h2></div>
-        <div className="admin-topbar-actions"><button className="admin-icon-btn" onClick={() => changeSection('logs')} aria-label="Audit log"><Bell size={20} /></button>
-          <div className="admin-user-chip"><div className="admin-user-avatar">{profile?.email?.charAt(0).toUpperCase() || 'A'}</div><div><strong>{profile?.email || 'Administrator'}</strong><small>Administrator</small></div></div>
-        </div>
-      </header>
-      <div className="admin-content">
-        {error && <div className="admin-error" role="alert">{error}<button onClick={() => void refresh()}>Retry</button></div>}
-        {loading ? <div className="admin-section">Loading clinic records…</div> : content}
-      </div>
-    </div>
+  return <div className="admin-shell"><aside id="admin-sidebar" className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}><SidebarBrand workspace="Administration" /><nav className="admin-nav">{navItems.map((item) => <button key={item.id} className={`admin-nav-item ${section === item.id ? 'active' : ''}`} onClick={() => changeSection(item.id)}><item.icon size={20} /><span>{item.label}</span></button>)}</nav><button className="admin-signout" onClick={signOut}><LogOut size={20} />Sign Out</button></aside>{sidebarOpen && <div className="admin-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+    <div className="admin-main"><header className="admin-topbar"><button className="admin-menu-btn" onClick={() => setSidebarOpen((value) => !value)} aria-label="Toggle menu" aria-expanded={sidebarOpen} aria-controls="admin-sidebar">{sidebarOpen ? <X size={22} /> : <Menu size={22} />}</button><div className="admin-topbar-title">{activeItem && <activeItem.icon size={20} />}<h2>{activeItem?.label}</h2></div><div className="admin-topbar-actions"><RefreshButton refresh={refresh} /><button className="admin-icon-btn" onClick={() => changeSection('notifications')} aria-label="Notifications"><Bell size={20} />{data.notifications.some((notification) => !notification.read_at) && <span className="admin-badge-dot" />}</button><div className="admin-user-chip"><div className="admin-user-avatar">{profile?.full_name?.charAt(0).toUpperCase() || profile?.email?.charAt(0).toUpperCase() || 'A'}</div><div><strong>{profile?.full_name || profile?.email || 'Administrator'}</strong><small>Administrator</small></div></div></div></header><div className="admin-content">{lastUpdated && <p className="clinic-ops-muted">Updated {lastUpdated.toLocaleTimeString(undefined, { timeZone: timezone })} · Refreshes every 15 seconds</p>}{error && <div className="admin-error" role="alert">{error} <button className="clinic-ops-button" onClick={() => void refresh()}>Retry</button></div>}{actionError && <div className="admin-error" role="alert">{actionError}</div>}{loading ? <div className="admin-section">Loading clinic records…</div> : content}</div></div>
     <StaffRegistrationModal open={staffModalOpen} defaultRole={staffRole} onClose={() => { setStaffModalOpen(false); void refresh(); }} />
   </div>;
 }

@@ -1,0 +1,347 @@
+/* Keep intrinsic table and form widths inside their own dashboard panels. */
+:is(.admin-shell, .patient-shell, .reception-shell) {
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+:is(.admin-main, .patient-main, .reception-main) {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+:is(.admin-content, .patient-content, .reception-content) {
+  width: 100%;
+  min-width: 0;
+  max-width: 1680px;
+  margin-inline: auto;
+  padding: clamp(16px, 2vw, 28px);
+}
+
+:is(.admin-section, .clinic-ops, .admin-panel, .doctor-panel, .patient-card, .reception-card),
+:is(.admin-section, .clinic-ops, .admin-panel, .doctor-panel, .patient-card, .reception-card) > *,
+:is(.admin-stats-grid, .doctor-stats-grid, .patient-stats-grid, .reception-stat-grid,
+  .admin-panels, .doctor-two-column, .doctor-bottom-grid, .doctor-order-grid,
+  .patient-dashboard-grid, .patient-booking-grid, .patient-profile-grid,
+  .patient-appointments-layout, .patient-doctors-layout, .patient-notifications-layout,
+  .reception-dashboard-grid, .reception-appointments-layout, .reception-walkin-layout,
+  .reception-notification-layout, .admin-settings-layout, .admin-schedule-grid,
+  .notifications-layout, .admin-logs-layout) > * {
+  min-width: 0;
+}
+
+:is(.admin-shell, .patient-shell, .reception-shell) :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:is(.admin-panel, .doctor-panel, .patient-card, .clinic-ops, .reception-card)
+  :is(h1, h2, h3, p, small, strong),
+:is(.admin-error, .clinic-ops-error, .clinic-ops-success, .doctor-error, .patient-error,
+  .dashboard-sync, .patient-profile-note, .admin-modal-error, .admin-modal-note) {
+  overflow-wrap: anywhere;
+}
+
+:is(.admin-stats-grid, .doctor-stats-grid, .patient-stats-grid, .reception-stat-grid) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.admin-panels,
+.doctor-two-column { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.doctor-bottom-grid,
+.patient-profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.patient-dashboard-grid,
+.patient-appointments-layout,
+.patient-doctors-layout,
+.patient-notifications-layout { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+.patient-booking-grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.admin-settings-layout { grid-template-columns: 240px minmax(0, 1fr); }
+.admin-schedule-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.admin-cards-grid { grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); }
+
+:is(.admin-stat-card, .doctor-stat-card, .patient-stat, .reception-stat) > div {
+  min-width: 0;
+}
+
+:is(.admin-stat-card, .doctor-stat-card, .patient-stat, .reception-stat) > svg {
+  flex: 0 0 auto;
+}
+
+:is(.admin-table-wrap, .doctor-table-wrap, .patient-table-wrap, .reception-table-wrap, .clinic-ops-table) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+:is(.admin-table-wrap, .doctor-table-wrap, .patient-table-wrap, .reception-table-wrap, .clinic-ops-table) > table {
+  width: 100%;
+  min-width: 620px;
+}
+
+.patient-table-wrap > .patient-table { min-width: 960px; }
+.patient-table .patient-person { min-width: 200px; }
+.patient-table .patient-avatar { flex-shrink: 0; }
+.patient-table th { white-space: nowrap; }
+.patient-table td:nth-child(2) { min-width: 180px; }
+.patient-table td:nth-child(3),
+.patient-table td:nth-child(4) { white-space: nowrap; }
+
+.doctor-table-wrap > .doctor-table { min-width: 1040px; }
+.doctor-table td:first-child { min-width: 200px; }
+.doctor-table td:nth-child(2) { min-width: 160px; }
+.doctor-table th,
+.doctor-table td:nth-child(3) { white-space: nowrap; }
+
+.doctor-week-grid {
+  max-width: 100%;
+  grid-template-columns: 50px repeat(6, minmax(90px, 1fr));
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.clinic-ops-form {
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+}
+
+:is(.clinic-ops-form, .doctor-form-grid, .patient-form-grid, .admin-form-row,
+  .reception-form-grid) > * { min-width: 0; }
+
+:is(.admin-panel-header, .doctor-panel-header, .patient-card-header, .reception-card-header,
+  .doctor-section-heading, .patient-profile-actions, .logs-toolbar, .logs-pagination) {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+:is(.admin-panel-header, .doctor-panel-header, .patient-card-header, .reception-card-header) > :is(h2, h3) {
+  min-width: 0;
+}
+
+.clinic-ops-notification > div:first-child { min-width: 0; flex-basis: 220px; }
+.clinic-activity-day { grid-template-columns: minmax(0, 7rem) minmax(0, 1fr) minmax(0, 2rem); }
+
+.patient-shell .patient-identity {
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  overflow-wrap: anywhere;
+}
+
+.patient-large-profile,
+.patient-large-profile > div { min-width: 0; }
+.patient-large-profile :is(h2, p) { overflow-wrap: anywhere; }
+.patient-reschedule-form { min-width: min(220px, 100%); }
+
+/* Leave room for the larger logo while the navigation scrolls independently. */
+:is(.admin-sidebar, .patient-sidebar, .reception-sidebar) {
+  max-height: 100vh;
+  max-height: 100dvh;
+  padding-top: 18px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.admin-nav,
+.patient-sidebar nav,
+.reception-sidebar nav {
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+}
+
+.admin-nav-item,
+.patient-sidebar nav button,
+.reception-sidebar nav button {
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.reception-sidebar nav button { transition-property: background, color; }
+
+:is(.admin-signout, .patient-logout, .reception-logout) {
+  flex: 0 0 auto;
+  min-height: 44px;
+  margin-top: 12px;
+}
+
+:is(.admin-topbar, .patient-topbar, .reception-topbar) {
+  min-width: 0;
+  min-height: 64px;
+  height: auto;
+  gap: 12px;
+  padding: 12px clamp(16px, 2vw, 28px);
+}
+
+:is(.admin-topbar-title, .admin-topbar-actions, .patient-top-actions, .reception-top-actions) {
+  min-width: 0;
+}
+
+:is(.admin-topbar-actions, .patient-top-actions, .reception-top-actions) { gap: 10px; }
+.admin-topbar-title h2 { overflow-wrap: anywhere; }
+.patient-top-search { min-width: 0; }
+
+:is(.admin-user-chip, .patient-user, .reception-user) {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+:is(.admin-user-chip, .patient-user, .reception-user) > :last-child:not(.patient-avatar):not(.reception-avatar) {
+  min-width: 0;
+  max-width: 180px;
+}
+
+:is(.admin-user-chip, .patient-user, .reception-user) strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reception-top-actions > .clinic-ops-button {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  padding: 9px 12px;
+  gap: 7px;
+}
+
+:is(.admin-menu-btn, .patient-menu, .reception-menu,
+  .admin-topbar-actions > button, .patient-top-actions > button, .reception-top-actions > button) {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+.admin-modal-overlay {
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.admin-modal {
+  min-width: 0;
+  min-height: 0;
+  max-height: calc(100vh - max(16px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)));
+  max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom)));
+  border-radius: 16px;
+  overscroll-behavior: contain;
+}
+
+.admin-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  gap: 12px;
+  background: #0a1525;
+}
+
+.admin-modal-header h2 { min-width: 0; overflow-wrap: anywhere; }
+.admin-modal-close { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
+.admin-modal-actions { flex-wrap: wrap; }
+
+@media (max-width: 1400px) and (min-width: 901px) {
+  :is(.admin-stats-grid, .doctor-stats-grid, .patient-stats-grid, .reception-stat-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .patient-date,
+  .reception-date { display: none; }
+}
+
+@media (max-width: 1200px) {
+  :is(.admin-panels, .doctor-two-column, .doctor-bottom-grid, .patient-dashboard-grid,
+    .patient-booking-grid, .patient-profile-grid, .patient-appointments-layout,
+    .patient-doctors-layout, .patient-notifications-layout) { grid-template-columns: minmax(0, 1fr); }
+
+  .admin-schedule-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .patient-shell .patient-profile-header { flex-wrap: wrap; }
+}
+
+@media (max-width: 900px) {
+  :is(.admin-main, .patient-main, .reception-main) { margin-left: 0; }
+
+  :is(.admin-sidebar, .patient-sidebar, .reception-sidebar) {
+    width: min(280px, calc(100vw - 44px));
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(-100%);
+    transition: transform .25s, visibility 0s linear .25s;
+  }
+
+  :is(.admin-sidebar, .patient-sidebar, .reception-sidebar).open {
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+    transition-delay: 0s;
+  }
+
+  :is(.admin-menu-btn, .patient-menu, .reception-menu) { display: grid; place-items: center; }
+  :is(.patient-top-search, .patient-date, .doctor-date, .reception-date) { display: none; }
+  :is(.admin-stats-grid, .doctor-stats-grid, .patient-stats-grid, .reception-stat-grid) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .admin-schedule-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  :is(.admin-content, .patient-content, .reception-content) { padding: 16px; }
+
+  :is(.admin-stats-grid, .doctor-stats-grid, .patient-stats-grid, .reception-stat-grid,
+    .admin-schedule-grid, .doctor-form-grid, .doctor-order-grid, .patient-inline-fields,
+    .patient-mode-grid, .patient-form-grid, .patient-type-grid, .reception-form-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-topbar { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px 12px; }
+  .admin-topbar-title { grid-column: 2; }
+  .admin-topbar-title h2 { font-size: 16px; }
+  .admin-topbar-actions { grid-column: 1 / -1; justify-content: flex-end; flex-wrap: wrap; width: 100%; }
+
+  :is(.patient-topbar, .reception-topbar) { display: grid; grid-template-columns: 44px minmax(0, 1fr); }
+  :is(.patient-top-actions, .reception-top-actions) { justify-content: flex-end; flex-wrap: wrap; margin-left: 0; }
+  .admin-topbar-actions .admin-search { display: none; }
+
+  .admin-user-chip > div:not(.admin-user-avatar),
+  .patient-user > span:not(.patient-avatar),
+  .reception-user > span:not(.reception-avatar) { display: none; }
+
+  .admin-user-chip > .admin-user-avatar,
+  .patient-user > .patient-avatar,
+  .reception-user > .reception-avatar { display: grid; flex: 0 0 auto; }
+
+  :is(.admin-user-chip, .patient-user, .reception-user) { padding: 4px; }
+  :is(.admin-section-heading, .clinic-ops-heading, .doctor-section-heading) { align-items: flex-start; }
+  :is(.admin-section-heading, .clinic-ops-heading, .patient-section-title) h1 { font-size: 23px; }
+  .doctor-section-heading .doctor-text-button { margin-left: 0; white-space: normal; }
+  .clinic-ops-form { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+
+  .patient-shell .patient-profile-header { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; }
+  .patient-shell .patient-identity { border: 0; padding: 0; }
+  .patient-profile-actions { margin: 0; }
+  .patient-shell .patient-notification-row { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+  .patient-shell .patient-notification-row > * { grid-column: 1; }
+  .patient-shell .patient-notification-row time { text-align: left; }
+  .patient-shell .patient-mini-notice { grid-template-columns: minmax(0, 1fr); }
+
+  .patient-shell .patient-directory-row { grid-template-columns: auto minmax(0, 1fr); }
+  .patient-shell .patient-directory-row p,
+  .patient-shell .patient-directory-row > button { grid-column: 2; grid-row: auto; }
+
+  .clinic-activity-day { gap: .5rem; }
+  .admin-modal-header,
+  .admin-modal-form { padding: 16px; }
+  .admin-form-row { flex-direction: column; }
+  .admin-role-toggle { flex-wrap: wrap; }
+  .admin-role-toggle button { flex: 1 1 140px; min-width: 0; min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.admin-sidebar, .patient-sidebar, .reception-sidebar) { transition: none; }
+}

@@ -39,3 +39,21 @@ venv/
 
 # Local development data
 *.sqlite3
+test-results/
+playwright-report/
+
+# Local credential and deployment secret files
+CREDENTIALS_NOTE.txt
+api-keys-*.csv
+.env.production
+.env.staging
+
+# Hosting link metadata, old download archives and database exports
+.vercel/
+*.zip
+*.sql.gz
+*.dump
+*.bak
+trivy-results.sarif
+.vercel
+.env*

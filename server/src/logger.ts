@@ -105,7 +105,7 @@ class Logger {
   }
 
   // Authentication logging
-  logAuth(action: string, userId?: string, success: boolean): void {
+  logAuth(action: string, userId: string | undefined, success: boolean): void {
     const level = success ? LogLevel.INFO : LogLevel.WARN;
     this.log(level, `Auth: ${action}`, { userId, success });
   }

@@ -1,0 +1,40 @@
+.sidebar-brand {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 0 6px 18px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-brand-logo {
+  display: block;
+  width: 152px;
+  height: 152px;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 14px;
+}
+
+.sidebar-brand-workspace {
+  color: #aab0ba;
+  font-size: 11px;
+  line-height: 1.4;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+@media (max-height: 650px) {
+  .sidebar-brand {
+    gap: 6px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+  }
+
+  .sidebar-brand-logo {
+    width: 136px;
+    height: 136px;
+  }
+}

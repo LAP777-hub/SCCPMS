@@ -1,0 +1,14 @@
+.residential-search { position: relative; width: 100%; }
+.residential-search .field-control { width: 100%; }
+.residential-search input { min-width: 0; }
+.residential-suggestions { position: absolute; z-index: 20; top: 48px; left: 0; right: 0; margin: 0; padding: 5px; list-style: none; max-height: 240px; overflow-y: auto; border: 1px solid #384454; border-radius: 10px; background: #0b1724; box-shadow: 0 12px 28px rgba(0,0,0,.35); }
+.residential-suggestions button { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 11px 9px; border: 0; border-radius: 6px; background: transparent; color: #e9ebef; font: inherit; font-size: 13px; line-height: 1.45; text-align: left; cursor: pointer; }
+.residential-suggestions button svg { flex-shrink: 0; margin-top: 2px; color: #9aaabd; }
+.residential-suggestions button:hover, .residential-suggestions button[aria-selected="true"] { background: #213246; }
+.residential-help, .residential-status { margin: 7px 0 0; color: #93a8bc; font-size: 12px; line-height: 1.5; }
+.residential-status:empty { display: none; }
+.residential-attribution { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 6px; font-size: 11px; }
+.residential-attribution a { color: #93a8bc; }
+.residential-loading { animation: residential-spin 1s linear infinite; }
+@keyframes residential-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .residential-loading { animation: none; } }

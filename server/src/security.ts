@@ -4,7 +4,8 @@ import crypto from 'crypto';
 
 // Request ID middleware for tracing
 export function requestId(req: Request, res: Response, next: NextFunction) {
-  const id = req.headers['x-request-id'] as string || crypto.randomUUID();
+  const supplied = req.headers['x-request-id'];
+  const id = typeof supplied === 'string' && /^[a-zA-Z0-9-]{1,80}$/.test(supplied) ? supplied : crypto.randomUUID();
   req.id = id;
   res.setHeader('X-Request-ID', id);
   next();
@@ -12,17 +13,6 @@ export function requestId(req: Request, res: Response, next: NextFunction) {
 
 // Request sanitization middleware
 export function sanitizeRequest(req: Request, res: Response, next: NextFunction) {
-  // Remove potential XSS vectors from query parameters
-  if (req.query) {
-    for (const key in req.query) {
-      if (typeof req.query[key] === 'string') {
-        req.query[key] = (req.query[key] as string)
-          .replace(/[<>]/g, '')
-          .trim();
-      }
-    }
-  }
-
   // Log suspicious requests
   const suspiciousPatterns = [
     /<script/i,
@@ -44,7 +34,9 @@ export function sanitizeRequest(req: Request, res: Response, next: NextFunction)
         path: req.path,
         pattern: pattern.source
       });
-      return res.status(400).json({ error: 'Invalid request content' });
+      // Clinical text can legitimately contain comparison signs or quoted HTML.
+      // Endpoint schemas validate inputs; SQL is parameterized and React escapes text.
+      break;
     }
   }
 
@@ -54,7 +46,7 @@ export function sanitizeRequest(req: Request, res: Response, next: NextFunction)
 // Request size validation
 export function validateRequestSize(req: Request, res: Response, next: NextFunction) {
   const contentLength = parseInt(req.headers['content-length'] || '0', 10);
-  const maxSize = 32 * 1024; // 32KB
+  const maxSize = 256 * 1024; // Allows validated SOAP notes, including Unicode.
 
   if (contentLength > maxSize) {
     logger.warn('Request size exceeded', {

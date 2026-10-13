@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "faculties": [
+    {
+      "code": "EMS",
+      "name": "Economic and Management Sciences",
+      "label": "EMS — Economic and Management Sciences",
+      "programmes": [
+        "Higher Certificate in Entrepreneurship",
+        "Diploma in Retail Business Management",
+        "Bachelor of Commerce (BCom) in Accounting",
+        "Bachelor of Commerce (BCom) in Economics",
+        "Advanced Diploma in Management",
+        "Postgraduate Diploma in Public Management",
+        "Postgraduate Diploma in Entrepreneurship",
+        "Master of Public Management and Governance"
+      ]
+    },
+    {
+      "code": "EDU",
+      "name": "Education",
+      "label": "EDU — Education",
+      "programmes": [
+        "Bachelor of Education (BEd) in Foundation Phase Teaching",
+        "Bachelor of Education (BEd) in Intermediate Phase Teaching",
+        "Bachelor of Education (BEd) in Senior Phase and Further Education and Training (FET) Teaching",
+        "Postgraduate Certificate in Education (PGCE)",
+        "Bachelor of Education Honours in Curriculum Studies",
+        "Postgraduate Diploma in Mathematics Education",
+        "Advanced Diploma in School Leadership and Management",
+        "Master of Education (MEd)"
+      ]
+    },
+    {
+      "code": "Humanities",
+      "name": "Humanities",
+      "label": "Humanities",
+      "programmes": [
+        "Higher Certificate in Court Interpreting",
+        "Higher Certificate in Heritage Studies",
+        "Bachelor of Arts (BA)",
+        "BA Honours in Archaeology",
+        "BA Honours in Languages (Afrikaans)",
+        "BA Honours in Languages (English)",
+        "BA Honours in Languages (Setswana)",
+        "BA Honours in Languages (isiXhosa)",
+        "Bachelor of Social Science Honours in Heritage Studies",
+        "Bachelor of Social Science Honours in Anthropology",
+        "Bachelor of Social Science Honours in History",
+        "Bachelor of Social Science Honours in Sociology",
+        "Master of Arts (MA) in Archaeology",
+        "MA in Heritage Studies",
+        "MA in Afrikaans",
+        "MA in English",
+        "MA in Setswana",
+        "MA in Anthropology",
+        "MA in History",
+        "MA in Sociology"
+      ]
+    },
+    {
+      "code": "NAS",
+      "name": "Natural and Applied Sciences",
+      "label": "NAS — Natural and Applied Sciences",
+      "programmes": [
+        "Diploma in Information and Communication Technology in Applications Development",
+        "Advanced Diploma in Information and Communication Technology in Applications Development",
+        "Diploma in Agriculture",
+        "Bachelor of Science (BSc)",
+        "BSc in Data Science",
+        "Bachelor of Environmental Science",
+        "BSc Honours in Computer Science",
+        "BSc Honours in Data Science",
+        "BSc Honours in Biological Sciences",
+        "BSc Honours in Mathematical Sciences",
+        "BSc Honours in Physical Sciences",
+        "Master of Science in e-Science"
+      ]
+    }
+  ]
+}

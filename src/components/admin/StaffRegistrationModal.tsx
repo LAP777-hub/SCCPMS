@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { X, UserPlus, Mail, Phone, Stethoscope, UsersRound, ShieldCheck, Check, Loader2 } from 'lucide-react';
 import { apiRequest } from '../../lib/api';
 
@@ -48,6 +48,10 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    if (open) setRole(defaultRole);
+  }, [open, defaultRole]);
+
   if (!open) return null;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -59,6 +63,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
       return;
     }
 
+    if (!email.trim().toLowerCase().endsWith('@spu.ac.za')) { setError('Use the staff member?s official @spu.ac.za email.'); return; }
     setLoading(true);
     try {
       await apiRequest('/api/staff', {
@@ -67,7 +72,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
           email,
           role,
           fullName,
-          phone,
+          phone: phone.replace(/[\s()-]/g, ''),
           department: department || undefined,
           specialty: role === 'doctor' ? (specialty || undefined) : undefined,
         }),
@@ -80,6 +85,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
   };
 
   const handleClose = () => {
+    if (loading) return;
     setFullName('');
     setEmail('');
     setPhone('');
@@ -100,7 +106,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
             <h2>Invitation Sent</h2>
             <p>
               An invitation for the {role === 'doctor' ? 'doctor' : 'receptionist'} account was sent to <strong>{email}</strong>.
-              They will set their own password and verify their phone at sign-in.
+              They will set their own password and enter a verification code sent to their university email at sign-in.
             </p>
             <button className="admin-btn-primary" onClick={handleClose}>
               <Check size={18} /> Done
@@ -110,7 +116,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
           <>
             <div className="admin-modal-header">
               <h2><UserPlus size={22} /> Register {role === 'doctor' ? 'Doctor' : 'Receptionist'}</h2>
-              <button className="admin-modal-close" onClick={handleClose}><X size={20} /></button>
+              <button className="admin-modal-close" onClick={handleClose} disabled={loading} aria-label="Close registration"><X size={20} /></button>
             </div>
 
             <form onSubmit={handleSubmit} className="admin-modal-form">
@@ -139,24 +145,24 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
                   <span className="admin-form-label">Full Name *</span>
                   <span className="admin-form-control">
                     <ShieldCheck size={16} />
-                    <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Dr. Juan Dela Cruz" />
+                    <input required minLength={2} maxLength={160} value={fullName} onChange={(e) => setFullName(e.target.value)} />
                   </span>
                 </label>
                 <label className="admin-form-group">
                   <span className="admin-form-label">Email Address *</span>
                   <span className="admin-form-control">
                     <Mail size={16} />
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@spup.edu.ph" />
+                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
                   </span>
                 </label>
               </div>
 
               <div className="admin-form-row">
                 <label className="admin-form-group">
-                  <span className="admin-form-label">Cellphone Number *</span>
+                  <span className="admin-form-label">Phone in international format *</span>
                   <span className="admin-form-control">
                     <Phone size={16} />
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09XX XXX XXXX" />
+                    <input type="tel" required pattern="\+[1-9][0-9]{7,14}" title="Use international format, beginning with + and a country code." value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </span>
                 </label>
               </div>
@@ -175,7 +181,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
                   <label className="admin-form-group">
                     <span className="admin-form-label">Specialty</span>
                     <span className="admin-form-control">
-                      <select value={specialty} onChange={(e) => setSpecialty(e.target.value)}>
+                        <select required value={specialty} onChange={(e) => setSpecialty(e.target.value)}>
                         <option value="">Select specialty</option>
                         {specialties.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
@@ -186,13 +192,13 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
 
               <div className="admin-modal-note">
                 <ShieldCheck size={15} />
-                <span>The user will be required to complete two-factor verification (OTP sent to their phone) on first login.</span>
+                <span>Email verification is required before the user can access clinic records.</span>
               </div>
 
               {error && <div className="admin-modal-error">{error}</div>}
 
               <div className="admin-modal-actions">
-                <button type="button" className="admin-btn-secondary" onClick={handleClose}>Cancel</button>
+                <button type="button" className="admin-btn-secondary" disabled={loading} onClick={handleClose}>Cancel</button>
                 <button type="submit" className="admin-btn-primary" disabled={loading}>
                   {loading ? <><Loader2 size={18} className="spin" /> Sending...</> : <><UserPlus size={18} /> Send Invitation</>}
                 </button>

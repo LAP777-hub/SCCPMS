@@ -5,8 +5,14 @@
  * Performs basic security checks on the application
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 import { join } from 'path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
+process.chdir(fileURLToPath(new URL('..', import.meta.url)));
+const require = createRequire(join(process.cwd(), 'server/package.json'));
+require('dotenv').config({ path: 'server/.env', quiet: true });
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -22,13 +28,20 @@ function log(message, color = 'reset') {
 
 function checkFilePermissions(filePath) {
   try {
-    const stats = require('fs').statSync(filePath);
+    if (process.platform === 'win32') {
+      const result = execFileSync('powershell.exe', ['-NoProfile', '-Command',
+        "$broad = @('S-1-1-0','S-1-5-11','S-1-5-32-545'); @((Get-Acl -LiteralPath $env:SCCPMS_AUDIT_FILE).Access | Where-Object { $_.AccessControlType -eq 'Allow' -and ($broad -contains $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value) -and (($_.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Write) -ne 0) }).Count"],
+        { encoding: 'utf8', env: { ...process.env, SCCPMS_AUDIT_FILE: filePath } }).trim();
+      const secure = result === '0';
+      log(`${secure ? '✅' : '⚠️'} ${filePath}: ${secure ? 'Windows ACL prevents broad write access' : 'Broad write access detected'}`, secure ? 'green' : 'yellow');
+      return secure;
+    }
+    const stats = statSync(filePath);
     const mode = stats.mode;
     
     // Check if file is readable
     const readable = (mode & 0o444) !== 0;
     // Check if file is writable (only owner should be able to write)
-    const ownerWritable = (mode & 0o200) !== 0;
     const groupWritable = (mode & 0o020) !== 0;
     const otherWritable = (mode & 0o002) !== 0;
     
@@ -105,7 +118,7 @@ function checkPackageDependencies() {
     const backendSecure = checkDependencies(serverPackageJson, 'backend');
     
     if (frontendSecure && backendSecure) {
-      log('✅ Dependencies look secure', 'green');
+      log('✅ Dependency version constraints checked; use npm audit for vulnerability verification', 'green');
     }
     
     return frontendSecure && backendSecure;
@@ -138,6 +151,7 @@ function checkCodeSecurity() {
   
   const filesToCheck = [
     'server/src/index.ts',
+    'server/src/app.ts',
     'server/src/api.routes.ts',
     'server/src/clinical.routes.ts',
     'server/src/scheduling.routes.ts',
@@ -220,11 +234,13 @@ function checkSSLConfiguration() {
   
   if (sslMode === 'verify-full') {
     log('✅ Database SSL mode set to verify-full (secure)', 'green');
+    return true;
   } else if (sslMode === 'disable') {
     log('⚠️  Database SSL mode disabled (not secure for production)', 'yellow');
   } else {
     log('⚠️  Database SSL mode not set', 'yellow');
   }
+  return false;
 }
 
 function main() {
@@ -235,11 +251,11 @@ function main() {
   const depsSecure = checkPackageDependencies();
   const codeSecure = checkCodeSecurity();
   checkGitSecurity();
-  checkSSLConfiguration();
+  const sslSecure = checkSSLConfiguration();
   
   log('\n=== Audit Result ===', 'blue');
   
-  if (filesSecure && depsSecure && codeSecure) {
+  if (filesSecure && depsSecure && codeSecure && sslSecure) {
     log('✅ Security audit passed!', 'green');
     process.exit(0);
   } else {

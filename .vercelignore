@@ -1,0 +1,39 @@
+# Preserved legacy applications and reference screenshots are not deployment inputs.
+/legacy/
+/design-references/
+/project-download.zip
+/frontend/
+/backend/
+/ADMIN/
+/DOCTORS/
+/PATIENTS/
+/RECEPTIONIST/
+/REGISTER_LOGIN-SCREENS/
+
+# Keep server/ available: src/lib/academicCatalogue.ts imports its catalogue JSON,
+# and the API is a separate Vercel project with Root Directory server.
+
+# Local build, editor and test artifacts.
+.git/
+.vercel/
+.vscode/
+.idea/
+**/node_modules/
+**/dist/
+/test-results/
+/playwright-report/
+**/*.log
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/venv/
+**/*.sqlite3
+
+# Deployment secrets come from Vercel project environment variables.
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
+/CREDENTIALS_NOTE.txt
+/api-keys-*.csv
+/scripts/setup-admin.js

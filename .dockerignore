@@ -2,7 +2,6 @@
 node_modules
 npm-debug.log
 yarn-error.log
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
@@ -59,6 +58,11 @@ screenshots
 
 # Server (only needed for backend build)
 server
+!server/
+server/*
+!server/src/
+server/src/*
+!server/src/academic-catalogue.json
 
 # Scripts (only needed for deployment)
 scripts
@@ -68,3 +72,11 @@ scripts
 *.tmp
 .cache
 .temp
+# Legacy apps and local credential notes are not part of the active build.
+frontend
+backend
+legacy
+design-references
+project-download.zip
+CREDENTIALS_NOTE.txt
+api-keys-*.csv

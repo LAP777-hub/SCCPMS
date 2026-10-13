@@ -34,3 +34,6 @@ coverage
 *.log
 *.tmp
 .cache
+.env.production
+.env.staging
+api-keys-*.csv

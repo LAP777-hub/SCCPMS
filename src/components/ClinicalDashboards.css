@@ -1,0 +1,249 @@
+.doctor-shell .doctor-form-grid {
+  padding: 20px;
+}
+.doctor-shell .doctor-form-grid .doctor-full-field {
+  grid-column: 1 / -1;
+  padding: 0;
+  margin: 0;
+}
+.doctor-shell .doctor-form-grid textarea {
+  width: 100%;
+  min-height: 88px;
+  border: 1px solid #27303c;
+  border-radius: 9px;
+  background: rgba(3, 11, 21, 0.6);
+  color: #e9ebef;
+  padding: 10px 12px;
+  font: inherit;
+  resize: vertical;
+}
+.doctor-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.doctor-visit-workflow {
+  padding: 20px;
+  background: rgba(3, 11, 21, 0.3);
+}
+.doctor-order-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.doctor-order-grid h3,
+.doctor-panel > h2 {
+  padding: 16px 20px 0;
+}
+.doctor-record-entry {
+  padding: 18px 20px;
+  border-bottom: 1px solid #27303c;
+  overflow-wrap: anywhere;
+}
+.doctor-record-entry h3,
+.doctor-record-entry h4 {
+  color: #edf1f6;
+  margin-bottom: 8px;
+}
+.doctor-record-entry p {
+  color: #c3cbd5;
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+.doctor-record-entry small,
+.doctor-detail-text {
+  color: #a7b1c0;
+}
+.doctor-record-entry .doctor-action-row {
+  margin-top: 12px;
+}
+.doctor-detail-text {
+  display: block;
+  max-width: 280px;
+  white-space: normal;
+  margin-top: 6px;
+}
+.doctor-table-search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 20px;
+  color: #a7b1c0;
+  font-size: 12px;
+}
+.doctor-table-search input,
+.patient-reschedule-form input,
+.patient-reschedule-form select {
+  border: 1px solid #27303c;
+  border-radius: 8px;
+  padding: 10px;
+  color: #edf1f6;
+  background: #0c1725;
+}
+.doctor-success,
+.patient-success {
+  color: #96d9b9;
+  padding: 12px 20px;
+}
+.doctor-error,
+.patient-error {
+  color: #ffc5c5;
+  background: #361b22;
+  padding: 12px 20px;
+  border-radius: 8px;
+  margin: 12px 20px;
+  white-space: normal;
+}
+.dashboard-sync {
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 12px 20px;
+}
+.patient-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 20px;
+  color: #c3cbd5;
+  font-size: 13px;
+}
+.patient-field .patient-input,
+.patient-field .patient-textarea {
+  width: 100%;
+  margin: 0;
+}
+.patient-booking-form > form,
+.patient-profile-form {
+  padding: 4px 0 20px;
+}
+.patient-booking-form > form > .patient-primary,
+.patient-profile-form > .patient-primary {
+  margin-left: 20px;
+}
+.patient-reschedule-form {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  gap: 10px;
+  padding: 16px 0;
+}
+.patient-reschedule-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.patient-record-entry {
+  padding: 18px 20px;
+  border-bottom: 1px solid #27303c;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.patient-record-entry h3 {
+  color: #edf1f6;
+  margin-bottom: 8px;
+}
+.patient-record-entry p {
+  margin: 8px 0;
+  color: #c3cbd5;
+  white-space: pre-wrap;
+}
+.patient-record-entry small {
+  color: #a7b1c0;
+}
+.patient-profile-note {
+  color: #a7b1c0;
+  padding: 16px 20px;
+  font-size: 13px;
+}
+.patient-profile-actions {
+  margin: 16px 20px;
+}
+.patient-identity {
+  min-width: 210px;
+}
+.patient-top-search {
+  max-width: 420px;
+}
+.patient-shell .patient-top-search input {
+  min-width: 0;
+}
+.patient-shell .patient-person > span:not(.patient-avatar) {
+  display: block;
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+}
+.patient-shell .patient-mini-notice {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.patient-shell .patient-notification-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.doctor-shell .doctor-notification {
+  grid-template-columns: minmax(0, 1fr);
+}
+.doctor-empty-state,
+.patient-empty-state {
+  padding: 28px 20px;
+  color: #a7b1c0;
+  line-height: 1.6;
+}
+.patient-shell .patient-stat {
+  cursor: default;
+}
+.patient-shell .patient-card > .patient-secondary {
+  margin: 12px 20px;
+}
+.patient-shell .patient-directory-row {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+.patient-shell .patient-directory-row > button {
+  grid-column: 4;
+}
+.doctor-shell .doctor-action-row .doctor-btn-primary {
+  margin-top: 0;
+}
+.patient-doctor-directory .patient-directory-row {
+  gap: 14px;
+}
+.doctor-shell button:disabled,
+.patient-shell button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+@media (max-width: 1000px) {
+  .doctor-order-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .doctor-request {
+    flex-wrap: wrap;
+  }
+  .doctor-visit-workflow {
+    padding: 8px;
+  }
+  .patient-shell .patient-profile-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .patient-shell .patient-identity {
+    border: 0;
+    padding: 12px 0 0;
+  }
+  .patient-shell .patient-notification-row {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+  .patient-shell .patient-directory-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .patient-shell .patient-directory-row p,
+  .patient-shell .patient-directory-row > button {
+    grid-column: 2;
+    grid-row: auto;
+  }
+}

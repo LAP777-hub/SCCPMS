@@ -1,0 +1,52 @@
+# SCCPMS Production Environment Configuration
+# Copy this file to .env.production and fill in the actual values
+
+# Frontend Configuration
+VITE_SUPABASE_URL=https://your-production-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-production-anon-key
+VITE_API_URL=https://api.your-domain.com
+
+# Backend Configuration
+NODE_ENV=production
+PORT=4000
+FRONTEND_ORIGIN=https://your-domain.com
+
+# Database Configuration
+DATABASE_URL=postgresql://user:password@production-host:5432/sccpms
+DATABASE_SSL_MODE=verify-full
+DATABASE_SSL_CA=-----BEGIN CERTIFICATE-----
+# Your SSL certificate authority if using custom CA
+# -----END CERTIFICATE-----
+
+# Supabase Configuration
+SUPABASE_URL=https://your-production-project.supabase.co
+SUPABASE_ANON_KEY=your-production-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-production-service-role-key
+
+# Security Configuration
+OTP_HMAC_SECRET=your-32-character-hmac-secret-key-minimum
+SESSION_SECRET=your-session-secret-for-production
+JWT_SECRET=your-jwt-secret-for-production
+
+# Email OTP (server secrets only; do not prefix these with VITE_)
+RESEND_API_KEY=re_replace_with_full_resend_api_key
+RESEND_FROM_EMAIL="SCCPMS <clinic@your-verified-domain.com>"
+# Verify the custom sending domain in Resend before production use.
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Logging
+LOG_LEVEL=info
+LOG_FORMAT=json
+
+# Monitoring
+ENABLE_METRICS=true
+SENTRY_DSN=your-sentry-dsn-for-error-tracking
+SENTRY_ENVIRONMENT=production
+
+# Backup Configuration
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE=daily
+BACKUP_RETENTION_DAYS=30

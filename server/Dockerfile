@@ -1,5 +1,5 @@
 # Backend Dockerfile
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -14,17 +14,22 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/certs ./certs
 COPY --from=builder /app/sql ./sql
+COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder /app/scripts/check-sms.mjs ./scripts/check-sms.mjs
+COPY --from=builder /app/scripts/check-email.mjs ./scripts/check-email.mjs
+COPY --from=builder /app/scripts/auth-redirect-settings.mjs ./scripts/auth-redirect-settings.mjs
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

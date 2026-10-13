@@ -1,5 +1,6 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert';
+import { sessionIdFromAccessToken } from '../src/auth.js';
 
 describe('Integration Tests', () => {
   describe('Database Connection', () => {
@@ -157,11 +158,14 @@ describe('Integration Tests', () => {
   });
 
   describe('Security', () => {
-    it('should validate JWT token format', () => {
-      const jwtToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test';
-      const parts = jwtToken.split('.');
-      
-      assert.strictEqual(parts.length, 3);
+    it('rejects malformed tokens and requires a session-bound UUID claim', () => {
+      assert.strictEqual(sessionIdFromAccessToken('header.payload'), null);
+      assert.strictEqual(sessionIdFromAccessToken('header.invalid.signature'), null);
+      const token = (claims: object) => `header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
+      assert.strictEqual(sessionIdFromAccessToken(token({ session_id: 'not-a-uuid' })), null);
+      assert.strictEqual(sessionIdFromAccessToken(token({})), null);
+      const id = '00000000-0000-4000-8000-000000000001';
+      assert.strictEqual(sessionIdFromAccessToken(token({ session_id: id })), id);
     });
 
     it('should sanitize user input', () => {

@@ -8,16 +8,19 @@ import DoctorDashboard from './components/DoctorDashboard';
 import PatientDashboard from './components/PatientDashboard';
 import ReceptionistDashboard from './components/ReceptionistDashboard';
 import PasswordRecoveryScreen from './components/PasswordRecoveryScreen';
+import RegistrationScreen from './components/RegistrationScreen';
 
 type View = 'register' | 'login';
 
 function PortalContent() {
-  const { session, profile, loading, otpVerified, passwordRecoveryRequired, invitationSetupRequired } = useAuth();
+  const { session, profile, loading, otpVerified, otpError, signOut, passwordRecoveryRequired, invitationSetupRequired } = useAuth();
   const [view, setView] = useState<View>('login');
 
   if (passwordRecoveryRequired || invitationSetupRequired) return <PasswordRecoveryScreen invitation={invitationSetupRequired} />;
 
-  if (loading) {
+  // Keep the login form mounted while its sign-in/profile requests finish.
+  // Unmounting it here discards the selected role and any login error.
+  if (loading && (!session || otpVerified)) {
     return (
       <main className="portal-shell">
         <BrandPanel />
@@ -39,7 +42,7 @@ function PortalContent() {
     return <DoctorDashboard />;
   }
 
-  if (session && otpVerified && profile?.role === 'patient') {
+  if (session && otpVerified && profile && ['patient', 'student', 'lecturer', 'staff'].includes(profile.role)) {
     return <PatientDashboard />;
   }
 
@@ -52,7 +55,13 @@ function PortalContent() {
       <main className="portal-shell">
         <BrandPanel />
         <section className="form-panel">
-          <Dashboard />
+          {profile ? <Dashboard /> : <div className="form-card">
+            <div className="form-heading"><h2>Account profile unavailable</h2><p>{otpError || 'Your account profile could not be loaded. Contact the clinic administrator.'}</p></div>
+            <div className="form-footer">
+              <button className="secondary-button" type="button" onClick={() => void signOut()}>Sign out</button>
+              <button className="primary-button" type="button" onClick={() => window.location.reload()}>Retry</button>
+            </div>
+          </div>}
         </section>
       </main>
     );
@@ -65,10 +74,7 @@ function PortalContent() {
         {view === 'login' ? (
           <LoginScreen onSwitchToRegister={() => setView('register')} />
         ) : (
-          <div className="form-card">
-            <div className="form-heading"><span className="mobile-kicker">ACCOUNT ACCESS</span><h2>Invitation Required</h2><p>Patient accounts are currently created by authorized clinic staff while university identity verification is being configured.</p></div>
-            <div className="success-state"><p>Contact the campus clinic or reception desk to request an account invitation using your university email and phone number.</p><button className="primary-button" type="button" onClick={() => setView('login')}>Return to sign in</button></div>
-          </div>
+          <RegistrationScreen onSwitchToLogin={() => setView('login')} />
         )}
       </section>
     </main>

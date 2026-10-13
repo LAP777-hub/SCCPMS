@@ -1,148 +1,43 @@
-#!/usr/bin/env node
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { developmentEmailSender, emailSender, validResendKey } from '../server/scripts/check-email.mjs';
 
-/**
- * Environment Variable Validation Script
- * Validates that all required environment variables are set and valid
- */
-
-import { config } from '../server/src/config.js';
-
-const COLORS = {
-  reset: '\x1b[0m',
-  green: '\x1b[32m',
-  red: '\x1b[31m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
+const projectRoot = fileURLToPath(new URL('..', import.meta.url));
+const require = createRequire(resolve(projectRoot, 'server/package.json'));
+const parse = require('dotenv').parse;
+const read = file => existsSync(file) ? parse(readFileSync(file)) : {};
+const backend = { ...read(resolve(projectRoot, 'server/.env')), ...process.env };
+const frontend = { ...read(resolve(projectRoot, '.env')), ...process.env };
+let valid = true;
+const check = (key, value, test = Boolean) => {
+  const passes = test(value);
+  console.log(`${key}: ${passes ? 'valid' : 'missing or invalid'}`);
+  valid &&= passes;
 };
-
-function log(message, color = 'reset') {
-  console.log(`${COLORS[color]}${message}${COLORS.reset}`);
+const url = value => { try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch { return false; } };
+check('SUPABASE_URL', backend.SUPABASE_URL, url);
+check('FRONTEND_ORIGIN', backend.FRONTEND_ORIGIN, value => {
+  try { return url(value) && new URL(value).origin === value; } catch { return false; }
+});
+for (const key of ['SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY']) check(key, backend[key]);
+check('RESEND_API_KEY', backend.RESEND_API_KEY, validResendKey);
+if (!validResendKey(backend.RESEND_API_KEY))
+  console.log('Email OTP delivery unavailable until a full Resend key is added; development startup can still run.');
+const sender = backend.RESEND_FROM_EMAIL || developmentEmailSender;
+check('RESEND_FROM_EMAIL', sender, value => Boolean(emailSender(value)));
+check('OTP_HMAC_SECRET', backend.OTP_HMAC_SECRET, value => typeof value === 'string' && value.length >= 32);
+check('DATABASE_URL', backend.DATABASE_URL, value => /^postgres(ql)?:\/\//.test(value || ''));
+check('PORT', backend.PORT || '4000', value => Number.isInteger(Number(value)) && Number(value) > 0 && Number(value) < 65536);
+for (const key of ['VITE_SUPABASE_URL','VITE_API_URL']) check(key, frontend[key], url);
+check('VITE_SUPABASE_ANON_KEY', frontend.VITE_SUPABASE_ANON_KEY);
+check('Matching Supabase projects', frontend.VITE_SUPABASE_URL === backend.SUPABASE_URL);
+check('University email domains', backend.UNIVERSITY_EMAIL_DOMAINS || 'spu.ac.za', value => value.split(',').map(domain => domain.trim().replace(/^@/, '')).includes('spu.ac.za'));
+if (backend.NODE_ENV === 'production') {
+  check('DATABASE_SSL_MODE', backend.DATABASE_SSL_MODE, value => value === 'verify-full');
+  check('Custom Resend sender', sender, value => Boolean(emailSender(value)) && !emailSender(value).testDomain && !emailSender(value).reservedDomain);
+  check('HTTPS frontend origin', backend.FRONTEND_ORIGIN, value => value?.startsWith('https://'));
 }
-
-function validateRequired(vars) {
-  let allValid = true;
-  
-  log('\n=== Required Environment Variables ===', 'blue');
-  
-  for (const [key, value] of Object.entries(vars)) {
-    if (!value) {
-      log(`❌ ${key}: MISSING`, 'red');
-      allValid = false;
-    } else {
-      log(`✅ ${key}: SET`, 'green');
-    }
-  }
-  
-  return allValid;
-}
-
-function validateOptional(vars) {
-  log('\n=== Optional Environment Variables ===', 'blue');
-  
-  for (const [key, value] of Object.entries(vars)) {
-    if (value) {
-      log(`✅ ${key}: SET`, 'green');
-    } else {
-      log(`⚠️  ${key}: NOT SET (optional)`, 'yellow');
-    }
-  }
-}
-
-function validateFormats(vars) {
-  log('\n=== Format Validation ===', 'blue');
-  
-  const formats = {
-    DATABASE_URL: (val) => val.startsWith('postgresql://'),
-    SUPABASE_URL: (val) => val.startsWith('https://'),
-    FRONTEND_ORIGIN: (val) => val.startsWith('http'),
-    PORT: (val) => !isNaN(parseInt(val)),
-  };
-  
-  let allValid = true;
-  
-  for (const [key, validator] of Object.entries(formats)) {
-    const value = vars[key];
-    if (value && !validator(value)) {
-      log(`❌ ${key}: INVALID FORMAT`, 'red');
-      allValid = false;
-    } else if (value) {
-      log(`✅ ${key}: VALID FORMAT`, 'green');
-    }
-  }
-  
-  return allValid;
-}
-
-function checkSecretStrength() {
-  log('\n=== Security Check ===', 'blue');
-  
-  const secrets = {
-    OTP_HMAC_SECRET: config.OTP_HMAC_SECRET,
-    SUPABASE_SERVICE_ROLE_KEY: config.SUPABASE_SERVICE_ROLE_KEY,
-  };
-  
-  let allSecure = true;
-  
-  for (const [key, value] of Object.entries(secrets)) {
-    if (value && value.length < 32) {
-      log(`❌ ${key}: TOO SHORT (minimum 32 characters)`, 'red');
-      allSecure = false;
-    } else if (value) {
-      log(`✅ ${key: ADEQUATE LENGTH (${value.length} characters)`, 'green');
-    } else {
-      log(`⚠️  ${key}: NOT SET`, 'yellow');
-    }
-  }
-  
-  return allSecure;
-}
-
-function main() {
-  log('SCCPMS Environment Variable Validation', 'blue');
-  log('======================================', 'blue');
-  
-  // Required variables
-  const requiredValid = validateRequired({
-    NODE_ENV: config.NODE_ENV,
-    PORT: config.PORT,
-    DATABASE_URL: config.DATABASE_URL,
-    SUPABASE_URL: config.SUPABASE_URL,
-    SUPABASE_ANON_KEY: config.SUPABASE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: config.SUPABASE_SERVICE_ROLE_KEY,
-    OTP_HMAC_SECRET: config.OTP_HMAC_SECRET,
-    AFRICASTALKING_USERNAME: config.AFRICASTALKING_USERNAME,
-    AFRICASTALKING_API_KEY: config.AFRICASTALKING_API_KEY,
-    FRONTEND_ORIGIN: config.FRONTEND_ORIGIN,
-  });
-  
-  // Optional variables
-  validateOptional({
-    DATABASE_SSL_MODE: config.DATABASE_SSL_MODE,
-    DATABASE_SSL_CA: config.DATABASE_SSL_CA,
-    AFRICASTALKING_SENDER_ID: config.AFRICASTALKING_SENDER_ID,
-  });
-  
-  // Format validation
-  const formatsValid = validateFormats({
-    DATABASE_URL: config.DATABASE_URL,
-    SUPABASE_URL: config.SUPABASE_URL,
-    FRONTEND_ORIGIN: config.FRONTEND_ORIGIN,
-    PORT: config.PORT,
-  });
-  
-  // Security check
-  const secretsSecure = checkSecretStrength();
-  
-  // Final result
-  log('\n=== Validation Result ===', 'blue');
-  
-  if (requiredValid && formatsValid && secretsSecure) {
-    log('✅ All validations passed!', 'green');
-    process.exit(0);
-  } else {
-    log('❌ Some validations failed. Please fix the issues above.', 'red');
-    process.exit(1);
-  }
-}
-
-main();
+console.log('Verify sender-domain status separately with npm run email:check --prefix server; configuration syntax does not establish delivery.');
+process.exitCode = valid ? 0 : 1;

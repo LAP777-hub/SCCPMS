@@ -1,8 +1,6 @@
 import { FormEvent, useState } from 'react';
 import {
   ArrowRight,
-  Eye,
-  EyeOff,
   LockKeyhole,
   LogIn,
   Mail,
@@ -16,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import type { Role } from '../lib/supabase';
+import PasswordToggle from './PasswordToggle';
 
 const roles: { value: Role; label: string; icon: typeof UserRound; description: string }[] = [
   { value: 'admin', label: 'Admin', icon: ShieldCheck, description: 'Full system administration' },
@@ -25,18 +24,22 @@ const roles: { value: Role; label: string; icon: typeof UserRound; description: 
 ];
 
 export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
-  const { signIn, pendingOtpUserId, pendingOtpPhone, otpError, verifyOtp, sendOtp, cancelOtp, requestPasswordReset } = useAuth();
+  const { signIn, pendingOtpUserId, pendingOtpEmail, otpError, otpNotice, authCallbackError, authCallbackNotice, authCallbackRetry, accountSuspended, verifyOtp, sendOtp, cancelOtp, requestPasswordReset } = useAuth();
   const [selectedRole, setSelectedRole] = useState<Role>('patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [resending, setResending] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const loginError = accountSuspended ? <>
+    <strong>Your account has been suspended</strong><br />
+    Contact admin: <a href="mailto:luckypinga077@gmail.com">luckypinga077@gmail.com</a>
+  </> : error || authCallbackError || otpError;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -46,17 +49,20 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
       return;
     }
     setLoading(true);
-    const { error: signInError } = await signIn(email, password, selectedRole);
-    setLoading(false);
-    if (signInError) {
-      setError(signInError);
+    try {
+      const { error: signInError } = await signIn(email, password, selectedRole);
+      if (signInError) setError(signInError);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Unable to sign in. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
-    if (!otpCode) {
+    if (!/^\d{6}$/.test(otpCode)) {
       setError('Please enter the 6-digit verification code.');
       return;
     }
@@ -67,24 +73,26 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
   };
 
   const handleResend = async () => {
+    if (loading || resending) return;
     setError('');
     setResending(true);
     const { error: resendError } = await sendOtp();
     setResending(false);
     if (resendError) {
       setError(resendError);
-    }
+    } else setOtpCode('');
   };
 
   const handlePasswordReset = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (resetting) return;
     setError('');
-    const { error: resetError } = await requestPasswordReset(email);
-    if (resetError) {
-      setError(resetError);
-      return;
-    }
-    setResetSent(true);
+    setResetting(true);
+    try {
+      const { error: resetError } = await requestPasswordReset(email);
+      if (resetError) setError(resetError);
+      else setResetSent(true);
+    } finally { setResetting(false); }
   };
 
   // OTP verification step
@@ -94,15 +102,16 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
         <div className="form-heading">
           <span className="mobile-kicker">TWO-FACTOR VERIFICATION</span>
           <h2>Verify Your Identity</h2>
-          <p>Enter the 6-digit code sent to your phone{pendingOtpPhone ? ` ending in ${pendingOtpPhone.slice(-4)}` : ''}.</p>
+          <p>{otpNotice ? 'Enter the 6-digit code sent to your email' : 'Request a 6-digit verification code for your account email'}{pendingOtpEmail ? ` (${pendingOtpEmail})` : ''}.</p>
         </div>
 
         <form onSubmit={handleVerify} className="login-form">
+          {otpNotice && <p role="status">{otpNotice}</p>}
           <div className="section-heading">
             <span className="section-icon"><KeyRound size={22} /></span>
             <div>
               <h3>Verification Code</h3>
-              <p>A one-time code was sent to your registered phone number.</p>
+              <p>{otpNotice ? 'The latest code expires after five minutes. Check your inbox and spam folder.' : 'Request a new code below, then check your inbox and spam folder.'}</p>
             </div>
           </div>
 
@@ -115,6 +124,9 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
+                  autoComplete="one-time-code"
+                  required
+                  pattern="[0-9]{6}"
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="Enter your code"
@@ -124,25 +136,25 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
             </label>
           </div>
 
-          {(error || otpError) && <div className="login-error">{error || otpError}</div>}
+          {loginError && <div className="login-error" role="alert">{loginError}</div>}
 
           <div className="form-footer login-footer">
-            <button className="secondary-button" type="button" onClick={cancelOtp}>
+            <button className="secondary-button" type="button" onClick={cancelOtp} disabled={loading || resending}>
               <ArrowLeft size={19} /> Cancel
             </button>
-            <button className="primary-button" type="submit" disabled={loading}>
+            <button className="primary-button" type="submit" disabled={loading || resending}>
               {loading ? 'Verifying...' : 'Verify & Sign In'} <ShieldCheck size={19} />
             </button>
           </div>
 
           <div className="login-options" style={{ justifyContent: 'center', marginTop: '16px' }}>
-            <button type="button" className="forgot-link" onClick={handleResend} disabled={resending}>
+            <button type="button" className="forgot-link" onClick={handleResend} disabled={resending || loading}>
               <RefreshCw size={14} /> {resending ? 'Sending...' : 'Resend code'}
             </button>
           </div>
         </form>
 
-        <div className="privacy-note"><LockKeyhole size={14} /> Two-factor authentication protects your account with an OTP sent to your phone.</div>
+        <div className="privacy-note"><LockKeyhole size={14} /> Two-factor authentication protects your account with a one-time code sent to your account email.</div>
       </div>
     );
   }
@@ -154,7 +166,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
         <form className="login-form" onSubmit={handlePasswordReset}>
           <label className="field-group field-wide"><span className="field-label">Email Address</span><span className="field-control"><Mail size={18} /><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></span></label>
           {error && <div className="login-error" role="alert">{error}</div>}
-          <div className="form-footer"><button className="secondary-button" type="button" onClick={() => setForgotMode(false)}><ArrowLeft size={18} />Back</button><button className="primary-button" type="submit">Send reset link <ArrowRight size={18} /></button></div>
+          <div className="form-footer"><button className="secondary-button" type="button" disabled={resetting} onClick={() => setForgotMode(false)}><ArrowLeft size={18} />Back</button><button className="primary-button" type="submit" disabled={resetting}>{resetting ? 'Sending reset link...' : 'Send reset link'} <ArrowRight size={18} /></button></div>
         </form>}
     </div>;
   }
@@ -207,30 +219,27 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
             <span className="field-label">Email Address</span>
             <span className="field-control">
               <Mail size={18} strokeWidth={1.7} />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email address" />
+              <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email address" />
             </span>
           </label>
-          <label className="field-group field-wide">
-            <span className="field-label">Password</span>
+          <div className="field-group field-wide">
+            <label className="field-label" htmlFor="login-password">Password</label>
             <span className="field-control">
               <LockKeyhole size={18} strokeWidth={1.7} />
-              <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
-              <button type="button" className="password-toggle" onClick={() => setShowPassword((s) => !s)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                {showPassword ? <EyeOff size={18} strokeWidth={1.6} /> : <Eye size={18} strokeWidth={1.6} />}
-              </button>
+              <input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" />
+              <PasswordToggle inputId="login-password" fieldName="password" visible={showPassword} onToggle={() => setShowPassword(value => !value)} disabled={loading} />
             </span>
-          </label>
+          </div>
         </div>
 
         <div className="login-options">
-          <label className="remember-me">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            <span>Keep me signed in</span>
-          </label>
+          <span className="remember-me">Email verification required</span>
           <button type="button" className="forgot-link" onClick={() => { setForgotMode(true); setError(''); }}>Forgot password?</button>
         </div>
 
-        {error && <div className="login-error">{error}</div>}
+        {authCallbackNotice && <p role="status">{authCallbackNotice}</p>}
+        {loginError && <div className="login-error" role="alert">{loginError}</div>}
+        {authCallbackRetry && <button className="secondary-button" type="button" onClick={() => window.location.reload()}>Retry account link</button>}
 
         <div className="form-footer login-footer">
           <button className="primary-button" type="submit" disabled={loading}>

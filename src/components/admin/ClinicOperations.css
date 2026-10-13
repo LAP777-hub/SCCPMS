@@ -1,0 +1,41 @@
+.clinic-ops { display: flex; flex-direction: column; gap: 18px; }
+.clinic-ops-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; padding: 20px; border: 1px solid #273849; border-radius: 12px; background: #07121f; }
+.clinic-ops-form h2, .clinic-ops-form .clinic-ops-wide { grid-column: 1 / -1; margin: 0; }
+.clinic-ops-form label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: #bbc3ce; }
+.clinic-ops-form input, .clinic-ops-form select, .clinic-ops-form textarea, .clinic-ops-select { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid #354455; border-radius: 7px; background: #030b15; color: #edf0f4; font: inherit; }
+.clinic-ops-form textarea { min-height: 90px; resize: vertical; }
+.clinic-ops-form input:focus, .clinic-ops-form select:focus, .clinic-ops-form textarea:focus { outline: 2px solid #9d3340; outline-offset: 1px; }
+.clinic-ops-actions, .admin-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.clinic-ops-actions button, .clinic-ops-button, .admin-primary-button, .admin-secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 13px; border: 1px solid #424b57; border-radius: 8px; background: #101e2f; color: #edf0f4; font: inherit; font-size: 12px; cursor: pointer; }
+.clinic-ops-actions button:hover, .clinic-ops-button:hover { background: #1c2e43; }
+.clinic-ops-actions button.primary, .clinic-ops-button.primary, .admin-primary-button { background: #c42030; border-color: #e93949; color: white; }
+.clinic-ops-actions button.danger { color: #ff9ca5; border-color: #82313a; }
+.clinic-ops-actions button:disabled, .clinic-ops-button:disabled, .admin-primary-button:disabled, .admin-secondary-button:disabled { cursor: wait; opacity: .55; }
+.clinic-ops-error, .admin-error { padding: 13px 17px; color: #ffc5ca; background: #36151e; border: 1px solid #87343e; border-radius: 8px; }
+.clinic-ops-success { padding: 13px 17px; color: #b9e5cd; background: #102b22; border: 1px solid #347353; border-radius: 8px; }
+.clinic-ops-muted { color: #9faabc; font-size: 12px; }
+.clinic-ops-heading, .admin-section-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+.clinic-ops-heading h1, .admin-section-heading h1 { margin: 0 0 8px; font-size: 25px; }
+.clinic-ops-heading p, .admin-section-heading p { margin: 0; color: #9faabc; }
+.clinic-ops-table { border: 1px solid #273849; border-radius: 12px; overflow-x: auto; }
+.clinic-ops-table table { width: 100%; border-collapse: collapse; }
+.clinic-ops-table th, .clinic-ops-table td { padding: 13px 15px; border-bottom: 1px solid #1c2939; font-size: 12px; text-align: left; vertical-align: top; }
+.clinic-ops-table th { color: #acb8c9; background: #091523; }
+.clinic-ops-table td small { display: block; margin-top: 5px; color: #9faabc; }
+.clinic-ops-empty, .admin-empty-state { padding: 30px !important; color: #a8b4c5; text-align: center !important; }
+.clinic-ops-notification { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 17px; border: 1px solid #273849; border-radius: 10px; }
+.clinic-ops-notification.unread { border-color: #a74751; }
+.clinic-ops-notification > div:first-child { flex: 1; }
+.clinic-ops-notification p { margin: 7px 0; }
+.clinic-ops-delete-confirm { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; padding: 12px; border: 1px solid #87343e; border-radius: 8px; }
+.admin-stat-card { flex-wrap: wrap; }
+.admin-stat-card strong { font-size: 26px; }
+.admin-stat-card span { color: #acb8c9; }
+.admin-panel > h2, .admin-panel > form { padding: 20px; }
+.admin-panel-header h2 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.admin-panel-header button { color: #f5ad63; background: none; border: none; cursor: pointer; }
+@media (max-width: 650px) { .clinic-ops-form { grid-template-columns: 1fr; padding: 15px; } .clinic-ops-heading, .admin-section-heading { align-items: flex-start; } }
+
+.clinic-activity-day { display: grid; grid-template-columns: 7rem 1fr 2rem; gap: 1rem; align-items: center; margin: .75rem 0; }
+.clinic-activity-track { height: .75rem; border-radius: .5rem; background: #ffffff12; overflow: hidden; }
+.clinic-activity-track > div { height: 100%; background: #df2339; border-radius: .5rem; }

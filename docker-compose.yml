@@ -1,83 +1,48 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:14-alpine
-    container_name: sccpms-postgres
-    environment:
-      POSTGRES_USER: sccpms_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-$(openssl rand -base64 32)}
-      POSTGRES_DB: sccpms
-    # Don't expose port 5432 to host - only accessible via Docker network
-    # ports:
-    #   - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./server/sql:/docker-entrypoint-initdb.d
-    networks:
-      - sccpms-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sccpms_user -d sccpms"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Backend API
   backend:
     build:
       context: ./server
       dockerfile: Dockerfile
-    container_name: sccpms-backend
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://sccpms_user:sccpms_password@postgres:5432/sccpms
-      DATABASE_SSL_MODE: disable
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      OTP_HMAC_SECRET: ${OTP_HMAC_SECRET}
-      AFRICASTALKING_USERNAME: ${AFRICASTALKING_USERNAME}
-      AFRICASTALKING_API_KEY: ${AFRICASTALKING_API_KEY}
-      AFRICASTALKING_SENDER_ID: ${AFRICASTALKING_SENDER_ID}
-      FRONTEND_ORIGIN: http://localhost:80
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to your Supabase PostgreSQL database}
+      DATABASE_EVENTS_URL: ${DATABASE_EVENTS_URL:-}
+      DATABASE_SSL_MODE: ${DATABASE_SSL_MODE:-verify-full}
+      DATABASE_SSL_CA: ${DATABASE_SSL_CA:-}
+      SUPABASE_URL: ${SUPABASE_URL:?Set SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:?Set SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?Set SUPABASE_SERVICE_ROLE_KEY}
+      OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?Set OTP_HMAC_SECRET}
+      RESEND_API_KEY: ${RESEND_API_KEY:?Set the full Resend API key}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:?Set a mailbox at a verified custom Resend sending domain}
+      UNIVERSITY_EMAIL_DOMAINS: spu.ac.za
+      # Dedicated Photon service for sustained production autocomplete.
+      ADDRESS_PHOTON_URL: ${ADDRESS_PHOTON_URL:-https://photon.komoot.io/api/}
+      ADDRESS_SEARCH_INTERVAL_MS: ${ADDRESS_SEARCH_INTERVAL_MS:-1100}
+      ADDRESS_SEARCH_DAILY_LIMIT: ${ADDRESS_SEARCH_DAILY_LIMIT:-500}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?Set the public HTTPS frontend origin}
+      TRUST_PROXY: 1
     ports:
-      - "4000:4000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - sccpms-network
+      - "127.0.0.1:4000:4000"
     restart: unless-stopped
+    stop_grace_period: 35s
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:4000/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # Frontend
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-        VITE_API_URL: ${VITE_API_URL}
-    container_name: sccpms-frontend
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?Set the same Supabase project URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?Set the public anon key}
+        VITE_API_URL: ${VITE_API_URL:?Set the API origin}
     ports:
       - "80:80"
     depends_on:
-      - backend
-    networks:
-      - sccpms-network
+      backend:
+        condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-    driver: local
-
-networks:
-  sccpms-network:
-    driver: bridge
