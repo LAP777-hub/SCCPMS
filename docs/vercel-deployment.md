@@ -2,7 +2,7 @@
 
 The active system is the React application in the repository root and the Express API in `server/`. Import the same GitHub repository into two Vercel projects. Vercel supports a separate project for each application directory. [Vercel monorepo imports](https://vercel.com/docs/monorepos#add-a-monorepo-through-the-vercel-dashboard).
 
-Both Vercel projects are linked to [LAP777-hub/SCCPMS](https://github.com/LAP777-hub/SCCPMS), production branch `main`: **sccpms** at `https://sccpms.vercel.app`, and **sccpms-api** at `https://sccpms-api.vercel.app`. Their production settings and separate environment variables are configured in Vercel. The frontend has three public variables; the API has fifteen private/runtime variables. Environment values remain outside Git. Deployment checks and failures are recorded in [the testing report](TESTING_REPORT.md).
+Both Vercel projects are linked to [LAP777-hub/SCCPMS](https://github.com/LAP777-hub/SCCPMS), production branch `main`: **sccpms** at `https://sccpms.vercel.app`, and **sccpms-api** at `https://sccpms-api.vercel.app`. Their production settings and separate environment variables are configured in Vercel. The frontend has three public variables; the API has sixteen private/runtime variables, including OTP validity/cooldown. Environment values remain outside Git. Deployment checks and failures are recorded in [the testing report](TESTING_REPORT.md).
 
 Both production deployments are READY. Live checks verify frontend assets/routing,
 API/database health 200, production CORS and protected GET/POST rejection. GitHub
@@ -62,9 +62,10 @@ Set these variables on the **API** project's Production environment:
 | `SUPABASE_ANON_KEY` | The same public key as frontend `VITE_SUPABASE_ANON_KEY` |
 | `SUPABASE_SERVICE_ROLE_KEY` | That project's private service-role or secret API key |
 | `OTP_HMAC_SECRET` | A securely generated random secret of at least 32 characters, consistent across all API instances |
+| `OTP_VALIDITY_SECONDS` | `600`: code validity from provider acceptance; permitted range 120–900 |
+| `OTP_RESEND_COOLDOWN_SECONDS` | `30`: minimum interval after accepted sending; permitted range 30–300 |
 | `RESEND_API_KEY` | The full Resend sending key |
 | `RESEND_FROM_EMAIL` | A sender on a custom domain verified and enabled for sending in Resend |
-| `UNIVERSITY_EMAIL_DOMAINS` | `spu.ac.za` |
 
 Vercel supplies `VERCEL=1` automatically. `PORT` is for the local server and does not select the hosted API URL. Store backend secrets in the API project's environment settings, not source files or frontend variables. Optional Photon address-search settings are documented in `server/.env.example`.
 
@@ -80,7 +81,7 @@ Keep certificate verification enabled. The API bundles the Supabase root CA, wit
 
 On Vercel, cross-instance updates use the durable database change log and bounded SSE: streams last up to 50 seconds, with authentication rechecked every 15 seconds, then reconnect. Persistent PostgreSQL `LISTEN` is disabled in that runtime. **Only port 6543 is required for Vercel clinic queries.** `DATABASE_EVENTS_URL` on port 5432 belongs to local or other persistent hosting that uses `LISTEN`; omit it from Vercel. Dashboard polling remains available when the event stream cannot connect.
 
-Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates and `021_shared_request_limits.sql` for request limits and address-provider budgets shared across instances. These replace dependence on instance-local counters for those limits.
+Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates, `021_shared_request_limits.sql` for shared request/address-provider budgets, and `022_otp_delivery_timing.sql` for pending/accepted OTP timing and safe resends.
 
 ```sh
 npm ci --prefix server
@@ -110,6 +111,8 @@ Supabase sends confirmation, invitation and password-reset mail. The API sends t
 **University email delivery is still blocked by sender DNS verification.** `clinic.spu.ac.za` was prepared in Resend but remains unverified. University IT must approve and publish the records in [RESEND_UNIVERSITY_DNS.md](../RESEND_UNIVERSITY_DNS.md). After verification, an approved example sender is `SCCPMS <login@clinic.spu.ac.za>`. The `onboarding@resend.dev` sender is limited to the Resend account owner and is refused by production configuration. Importing GitHub code does not complete DNS or SMTP setup.
 
 Use `npm run email:check --prefix server -- --production` from a securely configured operator environment for a read-only domain check. Real inbox acceptance still requires an authorized account receiving its actual confirmation/invitation and OTP; mocked tests and a successful domain check do not establish delivery.
+
+SPU has been asked to help with a subdomain. A separately owned verified sender also works with `@spu.ac.za` recipients. [Production email setup](email-delivery.md) describes the guarded template/SMTP runner, new two-hour Auth links, and ten-minute login OTPs. Deploy the frontend's confirmation landing page before applying the new hosted templates. SMTP activation remains gated on verified DNS.
 
 ## Import, connect and validate
 

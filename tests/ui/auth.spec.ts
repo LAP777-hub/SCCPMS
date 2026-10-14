@@ -92,7 +92,8 @@ for (const role of ['admin', 'doctor', 'patient', 'receptionist']) {
     await signIn(page, role);
     await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
     await expect(page.getByText(`Enter the 6-digit code sent to your email (${mailbox}).`)).toBeVisible();
-    await expect(page.getByText('The latest code expires after five minutes. Check your inbox and spam folder.')).toBeVisible();
+    await expect(page.getByText('Check your inbox and spam folder for the latest code.')).toBeVisible();
+    await expect(page.getByTestId('otp-expiry')).toContainText(/Code expires in [45]:\d{2}\./);
     expect(sends).toEqual([{ body: null }]);
     await page.getByLabel('6-Digit Code').fill('123456');
     await page.getByRole('button', { name: 'Verify & Sign In' }).click();
@@ -130,6 +131,9 @@ test('an older restoration result cannot undo successful email verification', as
   await page.reload({ waitUntil: 'domcontentloaded' });
   await Promise.all([started, profileRequested]);
   await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Verify & Sign In' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Resend code', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Verify & Sign In' })).toBeEnabled();
   const verificationResponse = page.waitForResponse(response => response.url().endsWith('/auth/otp/verify'));
   await page.getByLabel('6-Digit Code').fill('123456');
   await page.getByRole('button', { name: 'Verify & Sign In' }).click();
@@ -160,7 +164,7 @@ test('self registration sends university details to the actual registration rout
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Create one now' }).click();
   await page.getByLabel('Full name').fill('Registration Test');
-  await page.getByLabel('University email').fill('test123@spu.ac.za');
+  await page.getByLabel('Email address').fill('test123@spu.ac.za');
   await page.getByLabel('Phone (international format)').fill('+27123456789');
   await page.getByLabel('Student number').fill('TEST123');
   await fillStudentAcademicAddress(page);
@@ -212,15 +216,37 @@ test('receptionist schedule creates a real API slot in the clinic timezone', asy
   await expect(page.getByRole('button',{name:'Doctors & Staff',exact:true})).toHaveCount(0);
 });
 
-test('self registration blocks personal email before submitting to the server', async ({ page }) => {
+test('self registration accepts personal email without matching the student number', async ({ page }) => {
   await mockServices(page,'patient');
   let submissions=0;
-  await page.route('**/localhost:4000/auth/register',route=>{submissions++;return route.fulfill({json:{message:'Unexpected submission'}});});
+  let submitted:Record<string,unknown>|null=null;
+  await page.route('**/localhost:4000/auth/register',route=>{submissions++;submitted=route.request().postDataJSON();return route.fulfill({status:201,json:{message:'Confirm your chosen email address.'}});});
   await page.goto('/');await page.getByRole('button',{name:'Create one now'}).click();
-  await page.getByLabel('Full name').fill('University Student');await page.getByLabel('University email').fill('student@gmail.com');
+  await page.getByLabel('Full name').fill('University Student');await page.getByLabel('Email address').fill('student@gmail.com');
   await page.getByLabel('Phone (international format)').fill('+27123456789');await page.getByLabel('Student number').fill('2014000001');
   await fillStudentAcademicAddress(page);
   await page.getByLabel('Password (at least 10 characters)').fill('testing-password');await page.getByLabel('Confirm password', { exact: true }).fill('testing-password');
   await page.getByRole('button',{name:'Create account',exact:true}).click();
-  await expect(page.getByRole('alert')).toHaveText('Use your official @spu.ac.za university email.');expect(submissions).toBe(0);
+  await expect(page.getByText('Confirm your chosen email address.')).toBeVisible();
+  expect(submissions).toBe(1);expect(submitted).toMatchObject({email:'student@gmail.com',studentNumber:'2014000001'});
+});
+
+for (const role of ['doctor', 'receptionist']) test(`admin can invite a ${role} using a personal email address`, async ({ page }) => {
+  await mockServices(page,'admin');
+  let submitted:Record<string,unknown>|null=null;
+  await page.route('**/localhost:4000/api/staff',route=>{
+    if(route.request().method()==='POST'){submitted=route.request().postDataJSON();return route.fulfill({status:201,json:{data:{id,role,email:`${role}@outlook.com`}}});}
+    return route.fulfill({json:{data:[]}});
+  });
+  await signIn(page,'admin');await page.getByLabel('6-Digit Code').fill('123456');await page.getByRole('button',{name:'Verify & Sign In'}).click();
+  await page.getByRole('button',{name:'Doctors & Staff',exact:true}).click();
+  await page.getByRole('button',{name:`Invite ${role}`,exact:true}).click();
+  const modal=page.locator('.admin-modal');
+  await modal.getByLabel('Full Name *',{exact:true}).fill('Personal Email Staff Fixture');
+  await modal.getByLabel('Email Address *',{exact:true}).fill(`${role}@outlook.com`);
+  await modal.getByLabel('Phone in international format *',{exact:true}).fill('+27123456789');
+  if(role==='doctor') await modal.getByLabel('Specialty').selectOption('General Physician');
+  await modal.locator('button[type="submit"]').click();
+  await expect(modal.getByRole('heading',{name:'Invitation Sent'})).toBeVisible();
+  expect(submitted).toMatchObject({email:`${role}@outlook.com`,role});
 });

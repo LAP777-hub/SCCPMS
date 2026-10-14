@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from './config.js';
 import { allowedPreviousAppointmentStatuses } from './appointment-policy.js';
 import { bookableSlotConditions, schedulingConflict } from './workflow-policy.js';
-import { refinePatientIdentity, universityEmailSchema } from './university-policy.js';
+import { refinePatientIdentity, accountEmailSchema } from './university-policy.js';
 import { phoneSchema } from './phone.js';
 import { authCallbackUrl } from './auth-callback.js';
 import { deletePatientLoginAccount, PatientDeletionError } from './account-deletion.js';
@@ -89,7 +89,7 @@ router.get('/patients', allowRoles('admin', 'receptionist'), async (_req, res) =
 });
 
 export const patientSchema = z.object({
-  email: universityEmailSchema,
+  email: accountEmailSchema,
   fullName: z.string().trim().min(2).max(160),
   phone: phoneSchema,
   userType: z.enum(['Student', 'Lecturer', 'SPU Staff']),
@@ -302,7 +302,7 @@ router.post('/doctors', allowRoles('admin'), async (req, res) => {
 });
 
 export const staffSchema = z.object({
-  email: universityEmailSchema,
+  email: accountEmailSchema,
   role: z.enum(['doctor', 'receptionist']),
   fullName: z.string().trim().min(2).max(160),
   phone: phoneSchema,

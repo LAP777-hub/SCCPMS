@@ -63,7 +63,6 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
       return;
     }
 
-    if (!email.trim().toLowerCase().endsWith('@spu.ac.za')) { setError('Use the staff member?s official @spu.ac.za email.'); return; }
     setLoading(true);
     try {
       await apiRequest('/api/staff', {
@@ -106,7 +105,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
             <h2>Invitation Sent</h2>
             <p>
               An invitation for the {role === 'doctor' ? 'doctor' : 'receptionist'} account was sent to <strong>{email}</strong>.
-              They will set their own password and enter a verification code sent to their university email at sign-in.
+              They will set their own password and enter a verification code sent to their email at sign-in.
             </p>
             <button className="admin-btn-primary" onClick={handleClose}>
               <Check size={18} /> Done

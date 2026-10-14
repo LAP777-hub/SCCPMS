@@ -78,13 +78,12 @@ A successful domain check does not establish inbox delivery. Complete the login
 flow with an authorized account and the actually received code before accepting
 the email channel for live use. No external email was sent during this change.
 
-Supabase still sends account invitations, confirmation and password-recovery
-emails through its Auth configuration. Application OTP configuration does not
-change those settings. If using Resend for Auth mail too, configure custom SMTP
-in Supabase: `smtp.resend.com`, port `587` with STARTTLS, username `resend`, and
-the full API key as password, with a verified sender. Authorize the production
-Site URL and invitation/recovery redirects. These external settings were not
-changed by the application update. [Resend SMTP settings](https://resend.com/docs/send-with-smtp).
+Supabase sends account invitations, confirmation and password-recovery emails
+through its Auth configuration. Use the separate guarded configuration runner
+for production templates and Resend SMTP on port 465. It verifies the sender
+before changing SMTP and preserves existing redirects. SPU's subdomain response
+is pending; university recipients can also use a separately owned sender domain.
+[Email setup, timing and live acceptance](docs/email-delivery.md).
 
 ## Roles and clinic workflows
 
@@ -95,10 +94,10 @@ describes the hosted Site URL, allow-list and local-versus-hosted distinction.
 Run `npm run auth:check-redirects --prefix server` to check actual routing without
 sending messages or creating accounts.
 
-- The existing administrator may keep a personal email. New patients, doctors
-  and receptionists require university email addresses.
-- Students require their student number and associated university mailbox;
-  lecturer/staff patients require a staff number.
+- All roles accept any valid recipient email address. Email confirmation and
+  login OTP remain required; sender-domain verification is a separate setting.
+- Students require a student number; lecturer/staff patients require a staff
+  number. The email address need not match that university identity number.
 - Public registration creates patients. Admin creates doctor/receptionist
   invitations; recipients set a password, then complete email OTP for their role.
 - Role comes from protected server-managed metadata. OTP authorization is bound
@@ -139,8 +138,9 @@ addresses remain available whenever the map service is unavailable.
 Production needs HTTPS origins, full Resend credentials, a verified custom sender,
 configured Supabase Auth mail/redirects, and certificate-verified PostgreSQL TLS.
 `DATABASE_SSL_CA` supplies a custom CA when needed. Ordinary Supabase queries can
-use the transaction pooler on 6543; live `LISTEN` updates require a session
-connection on 5432, configured through `DATABASE_EVENTS_URL`.
+use the transaction pooler on 6543. Vercel uses a durable change log and bounded
+SSE on that connection. Local/persistent `LISTEN` deployments additionally use a
+session connection on 5432 through `DATABASE_EVENTS_URL`.
 
 Docker Compose requires `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. The backend
 image includes native migration and read-only email-check runners:
@@ -153,8 +153,8 @@ docker compose run --rm backend npm run email:check -- --production
 Supply deployment secrets before running these commands. The shutdown grace
 period permits active HTTP requests, audits and streams to drain. CI uses Node
 22 and dummy credentials for unit/database/browser checks; frontend Docker builds
-use actual public deployment variables. No GitHub workflow or hosted deployment
-was run during this update. Historical SMS helper scripts are retained but are
+use actual public deployment variables. Both Vercel applications deploy from
+GitHub main; completed CI/deployment results are in the testing report. Historical SMS helper scripts are retained but are
 not required by the active email OTP configuration.
 
 ## Verification

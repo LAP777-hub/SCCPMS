@@ -85,16 +85,16 @@ test('registration address and academic details persist in an isolated database 
     });
 
     const mapped = await register({
-      email: 'dbfixture123@spu.ac.za', password: 'database-fixture-password', fullName: 'Isolated Registration Fixture',
+      email: 'personal.fixture@gmail.com', password: 'database-fixture-password', fullName: 'Isolated Registration Fixture',
       phone: '+27123456789', userType: 'Student', studentNumber: 'DBFIXTURE123',
       department: 'NAS', program: 'Master of Science in e-Science',
       addressLine1: '  12 Isolated Test Street, Kimberley  ', addressLatitude: -28.745,
       addressLongitude: 24.762, addressSource: 'photon',
     });
     assert.equal(mapped.status, 201, JSON.stringify(mapped.body));
-    const mappedProfile = (await query('SELECT role,department,program,address_line1,address_latitude,address_longitude,address_source FROM profiles WHERE id=$1', [newUserId])).rows[0];
+    const mappedProfile = (await query('SELECT role,email,student_number,department,program,address_line1,address_latitude,address_longitude,address_source FROM profiles WHERE id=$1', [newUserId])).rows[0];
     assert.deepEqual(mappedProfile, {
-      role: 'patient', department: 'NAS', program: 'Master of Science in e-Science',
+      role: 'patient', email: 'personal.fixture@gmail.com', student_number: 'DBFIXTURE123', department: 'NAS', program: 'Master of Science in e-Science',
       address_line1: '12 Isolated Test Street, Kimberley', address_latitude: -28.745,
       address_longitude: 24.762, address_source: 'photon',
     });

@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { pool } from './db.js';
 import { config } from './config.js';
 import { logger } from './logger.js';
-import { universityEmailSchema } from './university-policy.js';
+import { accountEmailSchema } from './university-policy.js';
 import { otpEmailHash } from './otp-security.js';
 
 export type AppRole = 'admin' | 'doctor' | 'patient' | 'receptionist' | 'student' | 'lecturer' | 'staff';
@@ -87,11 +87,20 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return res.status(503).json({ error: 'Unable to validate your session right now.' });
     }
     if (!profile || !roleSet.has(trustedRole)) {
+      const missingRole = !Object.hasOwn(user.app_metadata, 'clinic_role');
+      const invitedAt = typeof user.invited_at === 'string' ? Date.parse(user.invited_at) : NaN;
+      const inviteAge = Date.now() - invitedAt;
+      // Invite delivery can win the race against profile/claim provisioning.
+      // Only the provider's confirmed, recently invited account gets a retry;
+      // an explicit unsupported role remains a permanent rejection.
+      if ((missingRole || roleSet.has(trustedRole)) && Number.isFinite(inviteAge) && inviteAge >= 0 && inviteAge <= 120000) {
+        return res.status(503).json({ error: 'Your invited account is still being prepared. Retry shortly.', code: 'ACCOUNT_SETUP_PENDING', retryAfterSeconds: 1 });
+      }
       logger.warn('Authentication failed: Invalid profile', { userId: user.id });
       return res.status(403).json({ error: 'A valid account profile is required.' });
     }
-    if (trustedRole !== 'admin' && !universityEmailSchema.safeParse(user.email).success) {
-      return res.status(403).json({ error: 'Use an official @spu.ac.za university account to access the clinic.' });
+    if (!accountEmailSchema.safeParse(user.email).success) {
+      return res.status(403).json({ error: 'A valid confirmed email address is required to access the clinic.' });
     }
 
     validationStage = 'account-status';

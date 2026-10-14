@@ -24,8 +24,6 @@ export default function RegistrationScreen({ onSwitchToLogin }: { onSwitchToLogi
     const value = (key: string) => String(fields.get(key) || '').trim();
     const password = String(fields.get('password') || '');
     if (password !== String(fields.get('confirmation') || '')) { setError('Passwords do not match.'); return; }
-    if (!value('email').toLowerCase().endsWith('@spu.ac.za')) { setError('Use your official @spu.ac.za university email.'); return; }
-    if (userType === 'Student' && value('email').split('@')[0].toLowerCase() !== value('identityNumber').toLowerCase()) { setError('Use studentnumber@spu.ac.za matching your student number.'); return; }
     if (userType === 'Student' && !isValidFacultyProgramme(department, programme)) { setError('Select your department and a programme belonging to it.'); return; }
     if (userType === 'Student' && !value('addressLine1')) { setError('Enter your residential address.'); return; }
     setBusy(true); setError('');
@@ -54,10 +52,10 @@ export default function RegistrationScreen({ onSwitchToLogin }: { onSwitchToLogi
   return <div className="form-card">
     <div className="form-heading"><span className="mobile-kicker">PATIENT REGISTRATION</span><h2>Create your clinic account</h2><p>Register as a university student or staff patient. Doctors and receptionists receive an invitation from the clinic.</p></div>
     <form onSubmit={submit}>
-      <div className="section-heading"><span className="section-icon"><UserPlus size={22} /></span><div><h3>Your university details</h3><p>Use your @spu.ac.za email for verification and a phone number for clinic contact. Students use studentnumber@spu.ac.za.</p></div></div>
+      <div className="section-heading"><span className="section-icon"><UserPlus size={22} /></span><div><h3>Your university details</h3><p>Use an email address you can access for verification and a phone number for clinic contact.</p></div></div>
       <div className="fields-grid">
         <label className="field-group field-wide"><span className="field-label">Full name</span><span className="field-control"><input name="fullName" autoComplete="name" required minLength={2} maxLength={160} /></span></label>
-        <label className="field-group"><span className="field-label">University email</span><span className="field-control"><input name="email" type="email" autoComplete="email" required maxLength={254} /></span></label>
+        <label className="field-group"><span className="field-label">Email address</span><span className="field-control"><input name="email" type="email" autoComplete="email" required maxLength={254} /></span></label>
         <label className="field-group"><span className="field-label">Phone (international format)</span><span className="field-control"><input name="phone" type="tel" autoComplete="tel" placeholder="+27123456789" pattern="\+[1-9][0-9]{7,14}" required /></span></label>
         <label className="field-group"><span className="field-label">University affiliation</span><span className="field-control"><select value={userType} onChange={event => { setUserType(event.target.value); setProgramme(''); }}><option>Student</option><option>Lecturer</option><option>SPU Staff</option></select></span></label>
         <label className="field-group"><span className="field-label">{userType === 'Student' ? 'Student number' : 'Staff number'}</span><span className="field-control"><input name="identityNumber" key={userType} required maxLength={40} /></span></label>
@@ -77,6 +75,6 @@ export default function RegistrationScreen({ onSwitchToLogin }: { onSwitchToLogi
       {error && <div className="login-error" role="alert">{error}</div>}
       <div className="form-footer"><button className="secondary-button" type="button" onClick={onSwitchToLogin} disabled={busy}><ArrowLeft size={18} />Back</button><button className="primary-button" type="submit" disabled={busy}>{busy ? 'Creating account...' : 'Create account'}<ArrowRight size={18} /></button></div>
     </form>
-    <div className="privacy-note"><LockKeyhole size={14} />Confirm your university email and enter an email verification code at sign-in.</div>
+    <div className="privacy-note"><LockKeyhole size={14} />Confirm your email and enter an email verification code at sign-in.</div>
   </div>;
 }

@@ -61,7 +61,7 @@ async function openRegistration(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Create one now' }).click();
   await page.getByLabel('Full name').fill('Password Visibility Fixture');
-  await page.getByLabel('University email').fill('2014999999@spu.ac.za');
+  await page.getByLabel('Email address').fill('2014999999@spu.ac.za');
   await page.getByLabel('Phone (international format)').fill('+27123456789');
   await page.getByLabel('Student number').fill('2014999999');
   await page.getByLabel('Department', { exact: true }).selectOption('EMS');

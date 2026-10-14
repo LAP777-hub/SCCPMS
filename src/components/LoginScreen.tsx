@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   LockKeyhole,
@@ -24,9 +24,11 @@ const roles: { value: Role; label: string; icon: typeof UserRound; description: 
 ];
 
 export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister: () => void }) {
-  const { signIn, pendingOtpUserId, pendingOtpEmail, otpError, otpNotice, authCallbackError, authCallbackNotice, authCallbackRetry, accountSuspended, verifyOtp, sendOtp, cancelOtp, requestPasswordReset } = useAuth();
-  const [selectedRole, setSelectedRole] = useState<Role>('patient');
-  const [email, setEmail] = useState('');
+  const { signIn, pendingOtpUserId, pendingOtpEmail, otpError, otpNotice, otpSending, otpChallengeReady, otpExpiresAt, otpRetryAt, signInHint, authCallbackError, authCallbackNotice, authCallbackRetry, accountSuspended, verifyOtp, sendOtp, cancelOtp, requestPasswordReset } = useAuth();
+  const [selectedRole, setSelectedRole] = useState<Role>(signInHint?.role ?? 'patient');
+  const [email, setEmail] = useState(signInHint?.email ?? '');
+  const emailEdited = useRef(false);
+  const roleSelected = useRef(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -36,6 +38,23 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
   const [forgotMode, setForgotMode] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!signInHint) return;
+    if (!emailEdited.current) setEmail(signInHint.email);
+    if (!roleSelected.current) setSelectedRole(signInHint.role);
+  }, [signInHint]);
+  useEffect(() => {
+    if (!pendingOtpUserId) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [pendingOtpUserId, otpExpiresAt, otpRetryAt]);
+  const codeSecondsRemaining = otpExpiresAt === null ? null : Math.max(0, Math.ceil((otpExpiresAt - now) / 1000));
+  const resendSecondsRemaining = otpRetryAt === null ? 0 : Math.max(0, Math.ceil((otpRetryAt - now) / 1000));
+  const codeExpired = codeSecondsRemaining === 0;
+  const canVerify = otpChallengeReady && !codeExpired;
+  const countdown = codeSecondsRemaining === null ? '' : `${Math.floor(codeSecondsRemaining / 60)}:${String(codeSecondsRemaining % 60).padStart(2, '0')}`;
   const loginError = accountSuspended ? <>
     <strong>Your account has been suspended</strong><br />
     Contact admin: <a href="mailto:luckypinga077@gmail.com">luckypinga077@gmail.com</a>
@@ -43,6 +62,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (loading) return;
     setError('');
     if (!email || !password) {
       setError('Please enter both your email and password.');
@@ -61,7 +81,12 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
 
   const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (loading) return;
     setError('');
+    if (otpSending || !canVerify) {
+      setError(codeExpired ? 'This code has expired. Request a new code.' : 'Wait for your verification email, or request a code to continue.');
+      return;
+    }
     if (!/^\d{6}$/.test(otpCode)) {
       setError('Please enter the 6-digit verification code.');
       return;
@@ -73,7 +98,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
   };
 
   const handleResend = async () => {
-    if (loading || resending) return;
+    if (loading || resending || otpSending || resendSecondsRemaining > 0) return;
     setError('');
     setResending(true);
     const { error: resendError } = await sendOtp();
@@ -102,7 +127,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
         <div className="form-heading">
           <span className="mobile-kicker">TWO-FACTOR VERIFICATION</span>
           <h2>Verify Your Identity</h2>
-          <p>{otpNotice ? 'Enter the 6-digit code sent to your email' : 'Request a 6-digit verification code for your account email'}{pendingOtpEmail ? ` (${pendingOtpEmail})` : ''}.</p>
+          <p>{otpSending && !otpChallengeReady ? 'Sending a verification code to your account email' : otpChallengeReady ? 'Enter the 6-digit code sent to your email' : 'Request a 6-digit verification code for your account email'}{pendingOtpEmail ? ` (${pendingOtpEmail})` : ''}.</p>
         </div>
 
         <form onSubmit={handleVerify} className="login-form">
@@ -111,7 +136,8 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
             <span className="section-icon"><KeyRound size={22} /></span>
             <div>
               <h3>Verification Code</h3>
-              <p>{otpNotice ? 'The latest code expires after five minutes. Check your inbox and spam folder.' : 'Request a new code below, then check your inbox and spam folder.'}</p>
+              <p>{otpSending && !otpChallengeReady ? 'Wait for the email request to finish. Your code timer starts once the provider accepts it.' : otpChallengeReady && !codeExpired ? 'Check your inbox and spam folder for the latest code.' : 'Request a new code below, then check your inbox and spam folder.'}</p>
+              {otpChallengeReady && codeSecondsRemaining !== null && <p data-testid="otp-expiry">{codeExpired ? 'This code has expired. Request a new code.' : `Code expires in ${countdown}.`}</p>}
             </div>
           </div>
 
@@ -126,6 +152,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
                   maxLength={6}
                   autoComplete="one-time-code"
                   required
+                  disabled={!canVerify || (otpSending && !otpChallengeReady)}
                   pattern="[0-9]{6}"
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
@@ -139,17 +166,17 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
           {loginError && <div className="login-error" role="alert">{loginError}</div>}
 
           <div className="form-footer login-footer">
-            <button className="secondary-button" type="button" onClick={cancelOtp} disabled={loading || resending}>
+            <button className="secondary-button" type="button" onClick={cancelOtp} disabled={loading || resending || otpSending}>
               <ArrowLeft size={19} /> Cancel
             </button>
-            <button className="primary-button" type="submit" disabled={loading || resending}>
-              {loading ? 'Verifying...' : 'Verify & Sign In'} <ShieldCheck size={19} />
+            <button className="primary-button" type="submit" disabled={loading || resending || otpSending || !canVerify}>
+              {otpSending ? 'Sending code...' : loading ? 'Verifying...' : 'Verify & Sign In'} <ShieldCheck size={19} />
             </button>
           </div>
 
           <div className="login-options" style={{ justifyContent: 'center', marginTop: '16px' }}>
-            <button type="button" className="forgot-link" onClick={handleResend} disabled={resending || loading}>
-              <RefreshCw size={14} /> {resending ? 'Sending...' : 'Resend code'}
+            <button type="button" className="forgot-link" onClick={handleResend} disabled={resending || loading || otpSending || resendSecondsRemaining > 0}>
+              <RefreshCw size={14} /> {resending || otpSending ? 'Sending...' : resendSecondsRemaining > 0 ? `Resend in ${resendSecondsRemaining}s` : 'Resend code'}
             </button>
           </div>
         </form>
@@ -164,7 +191,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
       <div className="form-heading"><span className="mobile-kicker">ACCOUNT RECOVERY</span><h2>Reset your password</h2><p>We’ll send a recovery link if an account matches that email.</p></div>
       {resetSent ? <div className="success-state"><h3>Check your email</h3><p>If an account exists for <strong>{email}</strong>, password reset instructions have been sent.</p><button className="secondary-button" type="button" onClick={() => { setForgotMode(false); setResetSent(false); }}>Back to sign in</button></div> :
         <form className="login-form" onSubmit={handlePasswordReset}>
-          <label className="field-group field-wide"><span className="field-label">Email Address</span><span className="field-control"><Mail size={18} /><input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></span></label>
+          <label className="field-group field-wide"><span className="field-label">Email Address</span><span className="field-control"><Mail size={18} /><input type="email" autoComplete="email" value={email} onChange={(event) => { emailEdited.current = true; setEmail(event.target.value); }} required /></span></label>
           {error && <div className="login-error" role="alert">{error}</div>}
           <div className="form-footer"><button className="secondary-button" type="button" disabled={resetting} onClick={() => setForgotMode(false)}><ArrowLeft size={18} />Back</button><button className="primary-button" type="submit" disabled={resetting}>{resetting ? 'Sending reset link...' : 'Send reset link'} <ArrowRight size={18} /></button></div>
         </form>}
@@ -194,7 +221,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
               type="button"
               key={role.value}
               className={`role-card ${selectedRole === role.value ? 'selected' : ''}`}
-              onClick={() => setSelectedRole(role.value)}
+              onClick={() => { roleSelected.current = true; setSelectedRole(role.value); }}
             >
               <span className="role-card-icon"><role.icon size={24} strokeWidth={1.6} /></span>
               <span className="role-card-text">
@@ -219,7 +246,7 @@ export default function LoginScreen({ onSwitchToRegister }: { onSwitchToRegister
             <span className="field-label">Email Address</span>
             <span className="field-control">
               <Mail size={18} strokeWidth={1.7} />
-              <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email address" />
+              <input type="email" autoComplete="username" required value={email} onChange={(e) => { emailEdited.current = true; setEmail(e.target.value); }} placeholder="Enter your email address" />
             </span>
           </label>
           <div className="field-group field-wide">

@@ -31,7 +31,7 @@ Confirmed, active accounts must verify the email OTP bound to their Auth
 session before entering protected clinic workflows. Students self-register
 with university identity and address details. Administrators invite doctors
 and receptionists, who choose their passwords using the invitation link.
-Only the existing administrator may use a personal mailbox.
+Every role may use any valid mailbox; email need not match the university ID.
 
 APIs cover scheduling, availability, leave, clinical visits/prescriptions/labs,
 notifications, patient records, operational analytics and audit history.
@@ -41,8 +41,10 @@ See [API documentation](../API_DOCUMENTATION.md) and [operations](../OPERATIONS.
 Vercel uses the transaction pooler on port 6543, managed connection pooling, retained
 audit writes, PostgreSQL-backed request/provider budgets, and bounded SSE
 streams backed by migration 020. Local/container mode retains session LISTEN
-on port 5432. Apply migrations 020/021 before serving Vercel traffic. A verified
-university Resend sender remains required for school inbox delivery.
+on port 5432. Apply migrations 020/021/022 before serving the new Vercel API.
+Login OTPs expire ten minutes after provider acceptance; failed resends retain a
+valid code. A verified Resend sender and Supabase custom SMTP are needed for live
+mail. [Email configuration and acceptance](../docs/email-delivery.md).
 
 ## Checks
 

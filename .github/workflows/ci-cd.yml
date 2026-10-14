@@ -66,7 +66,6 @@ jobs:
       RESEND_API_KEY: re_ci_test_key_for_mocked_email_only
       RESEND_FROM_EMAIL: SCCPMS <onboarding@resend.dev>
       FRONTEND_ORIGIN: http://localhost:5173
-      UNIVERSITY_EMAIL_DOMAINS: spu.ac.za
     
     services:
       postgres:

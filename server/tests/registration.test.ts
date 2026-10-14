@@ -21,19 +21,27 @@ test('staff patient registration requires staff identity and normalizes email', 
   assert.equal(parsed.email, 'patient@spu.ac.za');
 });
 
-test('all registration paths reject personal and lookalike university emails', () => {
-  for (const email of ['test123@gmail.com','test123@spu.ac.za.evil.invalid','test123@students.spu.ac.za']) {
-    assert.equal(registrationSchema.safeParse({ ...patient,email }).success,false);
-    assert.equal(patientSchema.safeParse({ ...invitedPatient,email }).success,false);
-    assert.equal(staffSchema.safeParse({ email,role:'doctor',fullName:'Test Doctor',phone:patient.phone,specialty:'General Medicine' }).success,false);
+test('all registration and invitation paths accept valid personal, university and custom-domain emails', () => {
+  for (const email of ['student.name@gmail.com', 'patient@outlook.com', 'patient@yahoo.com', 'clinician@clinic-fixture.co.za', 'test123@spu.ac.za', 'test123@students.spu.ac.za']) {
+    assert.equal(registrationSchema.safeParse({ ...patient,email }).success,true, email);
+    assert.equal(patientSchema.safeParse({ ...invitedPatient,email }).success,true, email);
+    for (const role of ['doctor', 'receptionist']) assert.equal(staffSchema.safeParse({ email,role,fullName:'Test Doctor',phone:patient.phone,specialty:'General Medicine' }).success,true, role);
   }
 });
 
-test('student email matches the student number and invitations require identity details', () => {
-  assert.equal(registrationSchema.safeParse({ ...patient,email:'someone@spu.ac.za' }).success,false);
+test('email need not match the student number while university identity details remain required', () => {
+  assert.equal(registrationSchema.safeParse({ ...patient,email:'someone@gmail.com' }).success,true);
   assert.equal(patientSchema.safeParse(invitedPatient).success,true);
   assert.equal(patientSchema.safeParse({ ...invitedPatient,userType:'SPU Staff',staffNumber:null }).success,false);
   assert.equal(staffSchema.safeParse({ email:'doctor@spu.ac.za',role:'doctor',fullName:'Test Doctor',phone:patient.phone,specialty:'General Medicine' }).success,true);
+});
+
+test('all account creation paths reject malformed email addresses and address injection', () => {
+  for (const email of ['', 'missing-at', 'patient@', 'patient@invalid', 'one@gmail.com,two@gmail.com', 'patient@gmail.com\r\nBcc: other@gmail.com', `${'x'.repeat(255)}@gmail.com`]) {
+    assert.equal(registrationSchema.safeParse({ ...patient,email }).success,false, email);
+    assert.equal(patientSchema.safeParse({ ...invitedPatient,email }).success,false, email);
+    assert.equal(staffSchema.safeParse({ email,role:'doctor',fullName:'Test Doctor',phone:patient.phone,specialty:'General Medicine' }).success,false, email);
+  }
 });
 
 test('students must supply a residential address, faculty and programme without requiring legacy address fields', () => {

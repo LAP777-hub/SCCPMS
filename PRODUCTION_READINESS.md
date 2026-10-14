@@ -1,3 +1,7 @@
+# Current email readiness ? 14 October 2026
+
+All valid recipient emails are accepted for every role. Student/staff identity details remain required; email need not match the student number. The new OTP expiry, safe confirmation landing and staff password flows are described in [email setup](docs/email-delivery.md), with successful/failed checks in [the testing report](docs/TESTING_REPORT.md). SPU has been asked to help with a sender subdomain. DNS verification, custom SMTP and real inbox acceptance are still pending. The dated history below records earlier milestones and policies.
+
 # SCCPMS email OTP readiness — 12 October 2026
 
 The supplied full Resend key is saved in ignored server configuration and was

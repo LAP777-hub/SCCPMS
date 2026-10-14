@@ -33,7 +33,6 @@ check('PORT', backend.PORT || '4000', value => Number.isInteger(Number(value)) &
 for (const key of ['VITE_SUPABASE_URL','VITE_API_URL']) check(key, frontend[key], url);
 check('VITE_SUPABASE_ANON_KEY', frontend.VITE_SUPABASE_ANON_KEY);
 check('Matching Supabase projects', frontend.VITE_SUPABASE_URL === backend.SUPABASE_URL);
-check('University email domains', backend.UNIVERSITY_EMAIL_DOMAINS || 'spu.ac.za', value => value.split(',').map(domain => domain.trim().replace(/^@/, '')).includes('spu.ac.za'));
 if (backend.NODE_ENV === 'production') {
   check('DATABASE_SSL_MODE', backend.DATABASE_SSL_MODE, value => value === 'verify-full');
   check('Custom Resend sender', sender, value => Boolean(emailSender(value)) && !emailSender(value).testDomain && !emailSender(value).reservedDomain);

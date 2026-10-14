@@ -20,6 +20,7 @@ export const authCallback = {
   code,
   hasCredentials: Boolean(accessToken || code),
   present: hasError || Boolean(action || accessToken || code),
+  emailLinkPending: query.has('email_action') || query.has('confirmation_url'),
 };
 
 export function authSessionId(accessToken: string): string | null {

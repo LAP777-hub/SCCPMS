@@ -52,7 +52,7 @@ test('email OTP uses Resend and retains its accepted message reference', async (
   assert.deepEqual(payload.to, [email]);
   assert.equal(payload.from, liveSettings.RESEND_FROM_EMAIL);
   assert.match(payload.text, /123456/);
-  assert.match(payload.text, /5|five/i);
+  assert.match(payload.text, /10 minutes/i);
   assert.ok(!JSON.stringify(accepted).includes('123456'));
 });
 for (const [name, payload] of [
@@ -65,7 +65,7 @@ for (const [name, payload] of [
   provider(payload);
   await assert.rejects(sendOtpEmail(email, '123456', userId, liveSettings), { reason: 'invalid_response' });
 });
-for (const [status, reason] of [[401, 'authentication'], [403, 'provider_rejected'], [422, 'provider_rejected'], [429, 'provider_rejected'], [503, 'provider_rejected']] as const) {
+for (const [status, reason] of [[401, 'authentication'], [403, 'provider_rejected'], [422, 'provider_rejected'], [429, 'rate_limited'], [503, 'provider_rejected']] as const) {
   test('email provider HTTP ' + status + ' produces a safe ' + reason + ' error', async () => {
     provider({ message: 'private provider details' }, status);
     await assert.rejects(sendOtpEmail(email, '123456', userId, liveSettings),
@@ -107,12 +107,15 @@ async function sendFixture(cooldown: boolean, hourlyCount = 0) {
   mock.method(pool, 'connect', async () => ({
     query: async (sql: string, values?: unknown[]) => {
       statements.push({ sql, values });
-      if (sql.includes('SELECT 1 FROM otp_challenges')) return { rows: [], rowCount: cooldown ? 1 : 0 };
-      if (sql.includes('SELECT count(*)')) return { rows: [{ count: String(hourlyCount) }], rowCount: 1 };
+      if (sql.includes('SELECT policy.*')) return { rows: [{ hourly_count: hourlyCount, retry_after_seconds: cooldown ? 30 : 0, id: null }], rowCount: 1 };
+      if (sql.includes('SELECT delivery_state')) return { rows: [{ delivery_state: 'pending', consumed_at: null, accepted_at: null, validity_seconds: 600, expires_at: new Date(), too_old: false }], rowCount: 1 };
       return { rows: [{ id: userId }], rowCount: 1 };
     }, release() {},
   }));
-  mock.method(pool, 'query', async (sql: string, values?: unknown[]) => { statements.push({ sql, values }); return { rows: [], rowCount: 1 }; });
+  mock.method(pool, 'query', async (sql: string, values?: unknown[]) => {
+    statements.push({ sql, values });
+    return { rows: sql.includes('AS verified') ? [{ verified: false, active_expires_at: null, retry_after_seconds: cooldown ? 30 : 0 }] : [], rowCount: 1 };
+  });
   const fetch = provider();
   const { result, res } = response();
   const req = request();
@@ -123,9 +126,10 @@ async function sendFixture(cooldown: boolean, hourlyCount = 0) {
 test('resend cooldown applies across login sessions and sends no second email', async () => {
   const { result, statements, fetch } = await sendFixture(true);
   assert.equal(result.status, 429);
-  const check = statements.find(item => item.sql.includes('SELECT 1 FROM otp_challenges'))!;
-  assert.deepEqual(check.values, [userId]);
-  assert.ok(!check.sql.includes('session_id'));
+  const check = statements.find(item => item.sql.includes('SELECT policy.*'))!;
+  assert.equal(check.values?.[0], userId);
+  assert.match(check.sql, /FROM otp_challenges WHERE user_id = \$1 AND sent_at/);
+  assert.equal(result.body.retryAfterSeconds, 30);
   assert.equal(fetch.mock.calls.length, 0);
 });
 test('persisted hourly email cap prevents repeated sends despite new sessions or server restart', async () => {
@@ -137,18 +141,21 @@ test('OTP send saves its email binding and accepted reference and ignores a reci
   const { result, statements, fetch } = await sendFixture(false);
   assert.equal(result.status, 202);
   assert.equal(result.body.deliveryMode, 'email');
-  assert.equal(statements.find(item => item.sql.includes('INSERT INTO otp_challenges'))?.values?.[3], otpEmailHash(userId, email));
+  assert.equal(statements.find(item => item.sql.includes('INSERT INTO otp_challenges'))?.values?.[4], otpEmailHash(userId, email));
   assert.ok(statements.some(item => item.sql.includes("delivery_state = 'accepted'")));
   assert.ok(statements.some(item => item.sql.includes('auth.otp_requested')));
   const payload = JSON.parse(String((fetch.mock.calls[0].arguments[1] as RequestInit).body));
   assert.deepEqual(payload.to, [email]);
   const sentCode = String(payload.text).match(/\b[0-9]{6}\b/)?.[0];
   assert.ok(sentCode);
-  const savedCode = statements.find(item => item.sql.includes('INSERT INTO otp_challenges'))?.values?.[2];
+  const savedCode = statements.find(item => item.sql.includes('INSERT INTO otp_challenges'))?.values?.[3];
   assert.match(String(savedCode), /^[a-f0-9]{64}$/);
   assert.notEqual(savedCode, sentCode);
   assert.ok(!JSON.stringify(result.body).includes(sentCode));
   assert.ok(!JSON.stringify(result.body).includes('attacker'));
+  assert.equal(result.body.expiresInSeconds, 600);
+  assert.equal(result.body.retryAfterSeconds, 30);
+  assert.ok(Date.parse(result.body.expiresAt) > Date.now());
 });
 test('missing email configuration returns an actionable safe unavailable response', async () => {
   Object.assign(config, { RESEND_API_KEY: '', RESEND_FROM_EMAIL: '' });
@@ -167,7 +174,7 @@ test('database connection failures return a safe unavailable response for send a
   }
 });
 test('provider rejection remains safe when failed-challenge cleanup also loses the database', async () => {
-  mock.method(pool, 'connect', async () => ({ query: async (sql: string) => ({ rows: sql.includes('SELECT count(*)') ? [{ count: '0' }] : [{ id: userId }], rowCount: sql.includes('SELECT 1 FROM otp_challenges') ? 0 : 1 }), release() {} }));
+  mock.method(pool, 'connect', async () => ({ query: async (sql: string) => ({ rows: sql.includes('SELECT policy.*') ? [{ hourly_count: 0, retry_after_seconds: 0, id: null }] : [], rowCount: 1 }), release() {} }));
   mock.method(pool, 'query', async () => { throw new Error('private connection failure'); });
   provider({ message: 'Rejected fixture' }, 422);
   const { result, res } = response();
@@ -177,7 +184,7 @@ test('provider rejection remains safe when failed-challenge cleanup also loses t
 });
 test('an old email verification cannot restore or authorize a changed email', async () => {
   const oldBinding = otpEmailHash(userId, email);
-  mock.method(pool, 'query', async (_sql: string, values: unknown[]) => ({ rowCount: values[2] === oldBinding ? 1 : 0 }));
+  mock.method(pool, 'query', async (_sql: string, values: unknown[]) => ({ rows: [{ verified: values[2] === oldBinding, active_expires_at: null, retry_after_seconds: 0 }], rowCount: values[2] === oldBinding ? 1 : 0 }));
   const req = request('other@spu.ac.za');
   const { result, res } = response();
   await getOtpStatus(req, res);
@@ -189,7 +196,7 @@ test('an old email verification cannot restore or authorize a changed email', as
 });
 test('a phone-only change leaves email OTP restoration and authorization valid', async () => {
   const binding = otpEmailHash(userId, email);
-  mock.method(pool, 'query', async (_sql: string, values: unknown[]) => ({ rowCount: values[2] === binding ? 1 : 0 }));
+  mock.method(pool, 'query', async (_sql: string, values: unknown[]) => ({ rows: [{ verified: values[2] === binding, active_expires_at: null, retry_after_seconds: 0 }], rowCount: values[2] === binding ? 1 : 0 }));
   const req = request(email, '+27999999999');
   const { result, res } = response();
   await getOtpStatus(req, res);
@@ -221,8 +228,8 @@ test('concurrent requests from two sessions share the account lock and send only
           turn = new Promise<void>(resolve => { unlock = resolve; });
           await previous;
         }
-        if (sql.includes('SELECT 1 FROM otp_challenges')) return { rows: [], rowCount: challengeCreated ? 1 : 0 };
-        if (sql.includes('SELECT count(*)')) return { rows: [{ count: '0' }], rowCount: 1 };
+        if (sql.includes('SELECT policy.*')) return { rows: [{ hourly_count: challengeCreated ? 1 : 0, retry_after_seconds: challengeCreated ? 30 : 0, id: null }], rowCount: 1 };
+        if (sql.includes('SELECT delivery_state')) return { rows: [{ delivery_state: 'pending', consumed_at: null, accepted_at: null, validity_seconds: 600, expires_at: new Date(), too_old: false }], rowCount: 1 };
         if (sql.includes('INSERT INTO otp_challenges')) challengeCreated = true;
         if (['COMMIT', 'ROLLBACK'].includes(sql)) unlock?.();
         return { rows: [{ id: userId }], rowCount: 1 };
@@ -230,7 +237,7 @@ test('concurrent requests from two sessions share the account lock and send only
       release() { unlock?.(); },
     };
   });
-  mock.method(pool, 'query', async () => ({ rows: [], rowCount: 1 }));
+  mock.method(pool, 'query', async () => ({ rows: [{ verified: false, active_expires_at: null, retry_after_seconds: 30 }], rowCount: 1 }));
   const fetch = provider();
   const first = response(), second = response();
   await Promise.all([

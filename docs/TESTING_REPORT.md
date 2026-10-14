@@ -1,8 +1,8 @@
 # SCCPMS testing report
 
-**Report date:** 13 October 2026 (Africa/Johannesburg)
+**Report date:** 14 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** both Git-connected Vercel production deployments are live, and the deployed API/database health returns 200. GitHub CI passes **79/79 browser tests**, backend checks and security checks. The server unit suite has **209 passes, 5 intentional database skips and no failures**; the separate real PostgreSQL suite passes **5/5 with no skips**. Production Auth redirects pass 4/4. Local university-network timeouts and connection resets remain recorded separately. University sender DNS verification and actual received-email/clinical acceptance remain incomplete.
+**Status:** the previous Git-connected Vercel release is live. The 14 October email changes pass **259 server cases with six intentional database skips**, eight additional configuration cases, a real OTP database case, and a **35/35 focused browser rerun** after four failures in the initial full 92-case run. Publication/cloud checks for these changes are recorded in section 11e as they complete. University sender DNS verification, custom SMTP and actual received-email/clinical acceptance remain incomplete; SPU's subdomain response is pending. Local university-network failures remain separately recorded.
 
 This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
@@ -908,9 +908,50 @@ email onboarding/OTP can be declared working. The public Photon provider's
 availability and sustained usage policy, backups, clinical/privacy review and
 real operator/load acceptance remain documented operational requirements.
 
+## 11e. Email timing, confirmation landing and staff passwords (14 October)
+
+The production OTP error was investigated using provider configuration and runtime diagnostics. A live send failure recorded HTTP 403 at 12:47:10 UTC on 14 October. The exact raw provider body was not exposed; the unverified sender is independently established by Resend's domain status. `clinic.spu.ac.za` was `not_started`, its DKIM/SPF records were unpublished, and click/open tracking was disabled. Supabase custom SMTP was absent; production Site URL and redirects were already correct. Eleven earlier accepted messages had delivered events, but no new message or measured university inbox latency was established by this check. No emails were sent during this work.
+
+SPU does not grant the user school-domain DNS access. The user has requested help with a subdomain and is waiting for SPU. IT can publish provider records without granting DNS access. A separately owned verified sender would also work with university recipients. Sender verification and recipient university-email enforcement are separate requirements.
+
+Implemented changes:
+
+- OTP expiry starts after provider acceptance, defaults to ten minutes, and is returned to the UI. Resend cooldown defaults to 30 seconds. Failed resends preserve a prior valid code; a new accepted code atomically replaces it. Pending challenges reuse their secret-derived code and idempotency key after ambiguous delivery, without storing plaintext codes.
+- Provider calls have a ten-second total budget and at most one retry for transient errors. Permanent sender/quota errors return promptly. Accepted acknowledgements survive a database-finalization retry; per-user reservations and failed-challenge limits are durable across instances. Late HTTP completion cannot write another response.
+- Confirmation/invitation/recovery emails open the live application before following their one-use Supabase verification link. An explicit Continue protects against email prefetching. Staff create and confirm their own passwords, then sign in using their trusted email/role and complete OTP; patients return to sign-in after confirmation. Authentication requests and logout have deadlines.
+- A fresh, provider-confirmed invitation with temporarily missing role/profile setup returns a bounded retry response, while invalid roles still fail closed. Callback SDK network errors offer retry; malformed implicit links retain invalid-link guidance. Late sign-in hints fill untouched inputs without replacing user typing.
+- A guarded operator runner prepares branded templates/two-hour Auth links independently of SMTP. SMTP changes require the exact Resend sender domain to be verified, sending enabled and tracking disabled. It preserves existing redirects and verifies saved configuration without printing secrets.
+
+| Completed check | Result and boundary |
+| --- | --- |
+| Actual Node22 full server suite | **265 total: 259 passed, six intentional database skips, zero failed**, 82.579s; precedes the eight operational configuration tests below |
+| Additional SMTP/template configuration tests | **8/8 passed**, zero skips; mocked providers, no hosted mutation or mail |
+| Provider resilience checks | **10/10 passed**; retry identity/budgets, safe 403/429 classification, actual loopback stalled-body abort; no Resend mail |
+| New OTP real PostgreSQL case | **1/1 passed**, 25.308s; isolated schema cleanup, migration repeatability, cooldown/leases, rollback/recovery, concurrent finalization and code limits |
+| Live additive migration022 | Applied transactionally under migration lock; version and all six added columns verified; no account/clinical row edits |
+| Vercel runtime timing variables | Production API configured with `OTP_VALIDITY_SECONDS=600` and `OTP_RESEND_COOLDOWN_SECONDS=30`; obsolete university email-domain setting subsequently removed |
+| Frontend typecheck/build | Passed on Node22 after final corrections |
+| Initial full browser run | **88/92 passed; four failures retained**, 2.3min; artifacts in ignored `test-results/ui-email-performance/` |
+| Corrected focused browser run | **35/35 passed**, 43.1s; all 22 callback and 13 new email-flow cases; artifacts retained separately |
+
+The initial browser failures exposed two source issues and one duplicated test-fixture issue: Supabase's implicit-link exception has a synthetic status500 and was misclassified as a temporary outage; a late trusted signup hint did not fill an already mounted input; two staff tests assumed the password-update payload omitted the SDK's nullable PKCE fields. Error classification now uses the API error type, untouched inputs respond to late hints, and tests allow those known SDK fields while verifying exactly one password update and no role mutation. All four cases pass on the corrected run. The complete initial run is not relabelled as a full uninterrupted pass.
+
+Read-only review found that the SDK can retain an in-memory session after a failed logout when browser storage is blocked. An explicit shared storage adapter and targeted regression address that fallback. Normal sign-in/password requests have a 12-second HTTP deadline; SDK token-refresh retries can take roughly 37 seconds during a stalled Auth service, so the per-request timeout is not a promise of a 12-second overall restoration. Provider acknowledgement and browser tests do not guarantee university inbox arrival within seconds.
+
+Cloud publication and template readback results will be appended after the Git-connected deployment completes. Real received mail, inbox timing and staff onboarding remain unverified until SPU supplies and verifies the sender subdomain and custom SMTP is activated. [Email setup and live acceptance](email-delivery.md).
+
+### Later recipient-email policy correction
+
+The user then requested that every email be acceptable. The active frontend, staff invitation form, public/admin patient schemas and trusted login validation now accept any valid email address. The student-email prefix no longer has to match the student number; required student/staff identity numbers, academic/address data, trusted roles, suspension checks, confirmation and OTP are retained. The old `UNIVERSITY_EMAIL_DOMAINS` runtime setting, examples, CI setting and environment validation were removed. Earlier university-only tests remain historical evidence of the superseded policy.
+
+The corrected registration/Auth/persistence/phone regression command passed **63/63**, with no skips, on actual Node22 in 33.803s. It includes Gmail/Outlook/Yahoo/custom-domain acceptance, all four role authentications, malformed-address rejection, unconfirmed/suspended accounts and identity requirements. A real database fixture now uses a personal email unrelated to its student number and verifies the persisted email/number alongside its address/programme. Full browser/cloud results are recorded below as they complete.
+
+The subsequent full browser run passed **94/95** in 2.7 minutes, including the blocked-storage/logout recovery case. Its single failure was the new doctor's invitation fixture using an exact accessible-name selector for a wrapped specialty select; the actual label includes option text. The fixture now uses the existing label's supported substring match. This failed run remains in `test-results/ui-email-policy/`; its correction is checked separately before cloud publication.
+
 ## 12. Supporting documents
 
 - [Operations](../OPERATIONS.md)
+- [Email timing, sender setup and SMTP](email-delivery.md)
 - [Readiness history](../PRODUCTION_READINESS.md)
 - [Auth email callbacks and hosted redirects](auth-email-links.md)
 - [Registration catalogue and NAS correction](academic-catalogue.md)

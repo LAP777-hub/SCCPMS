@@ -18,12 +18,12 @@ async function requestAuthentication() {
   return { req, res, next };
 }
 
-async function authenticate(active: boolean, confirmed = true) {
+async function authenticate(active: boolean, confirmed = true, email = 'test@spu.ac.za', role = 'patient') {
   mock.method(pool, 'query', async () => ({ rows: [{ active }] }));
   mock.method(globalThis, 'fetch', async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const data = url.includes('/auth/v1/user')
-      ? { id: userId, email: 'test@spu.ac.za', email_confirmed_at: confirmed ? '2026-10-12T00:00:00Z' : null, app_metadata: { clinic_role: 'patient', clinic_phone: '+27123456789' }, user_metadata: {} }
+      ? { id: userId, email, email_confirmed_at: confirmed ? '2026-10-12T00:00:00Z' : null, app_metadata: { clinic_role: role, clinic_phone: '+27123456789' }, user_metadata: {} }
       : [{ id: userId, role: 'admin', email: 'attacker@spu.ac.za', phone: '+27999999999' }];
     return new globalThis.Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
   });
@@ -39,6 +39,28 @@ test('editing a client-visible profile cannot change account role or OTP destina
   assert.equal(req.auth?.profile.role, 'patient');
   assert.equal(req.auth?.profile.email, 'test@spu.ac.za');
   assert.equal(req.auth?.profile.phone, '+27123456789');
+});
+
+for (const role of ['patient', 'doctor', 'receptionist', 'admin']) test(`${role} authentication accepts a confirmed personal mailbox without changing its trusted role`, async () => {
+  const email = `${role}@gmail.com`;
+  const { req, next } = await authenticate(true, true, email, role);
+  assert.equal(next.mock.calls.length, 1);
+  assert.equal(req.auth?.email, email);
+  assert.equal(req.auth?.role, role);
+});
+
+test('allowing personal mailboxes retains confirmation, suspension and malformed-address checks', async () => {
+  const unconfirmed = await authenticate(true, false, 'patient@gmail.com');
+  assert.equal(unconfirmed.next.mock.calls.length, 0);
+  assert.equal(unconfirmed.res.json.mock.calls[0].arguments[0].code, 'EMAIL_CONFIRMATION_REQUIRED');
+  mock.restoreAll();
+  const suspended = await authenticate(false, true, 'patient@outlook.com');
+  assert.equal(suspended.next.mock.calls.length, 0);
+  assert.equal(suspended.res.json.mock.calls[0].arguments[0].code, 'ACCOUNT_DISABLED');
+  mock.restoreAll();
+  const invalid = await authenticate(true, true, 'not-an-email');
+  assert.equal(invalid.next.mock.calls.length, 0);
+  assert.deepEqual(invalid.res.status.mock.calls[0].arguments, [403]);
 });
 
 test('deactivated accounts cannot reach any protected workflow', async () => {
@@ -198,6 +220,85 @@ test('an invalid trusted role remains a permanent 403 even when a profile exists
   const { res } = await authenticateProfileProblem('invalid-role');
   assert.deepEqual(res.status.mock.calls[0].arguments, [403]);
   assert.deepEqual(res.json.mock.calls[0].arguments[0], { error: 'A valid account profile is required.' });
+});
+
+async function invitationProvisioningFixture(options: {
+  invitedAt?: string; role?: string | null; profilePresent?: boolean; confirmed?: boolean;
+  userMetadata?: object; createdAt?: string;
+} = {}) {
+  let role = options.role;
+  let profilePresent = options.profilePresent ?? true;
+  const query = mock.method(pool, 'query', async () => ({ rows: [{ active: true }] }));
+  mock.method(globalThis, 'fetch', async (input: RequestInfo | URL) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    const data = url.pathname.endsWith('/auth/v1/user') ? {
+      id: userId, email: 'test@spu.ac.za', email_confirmed_at: options.confirmed === false ? null : new Date().toISOString(),
+      ...(options.invitedAt ? { invited_at: options.invitedAt } : {}),
+      ...(options.createdAt ? { created_at: options.createdAt } : {}),
+      app_metadata: role === undefined ? {} : { clinic_role: role }, user_metadata: options.userMetadata ?? {},
+    } : profilePresent ? [{ id: userId, email: 'test@spu.ac.za', role: 'patient' }] : [];
+    return globalThis.Response.json(data);
+  });
+  return { query, async authenticate() { return requestAuthentication(); }, ready() { role = 'doctor'; profilePresent = true; } };
+}
+
+for (const [name, role, profilePresent] of [
+  ['missing trusted role', undefined, true],
+  ['missing profile', 'doctor', false],
+  ['missing profile and trusted role', undefined, false],
+] as const) test(`a confirmed recent invitation with ${name} fails closed with a retryable setup response`, async () => {
+  const fixture = await invitationProvisioningFixture({ invitedAt: new Date(Date.now() - 1000).toISOString(), role, profilePresent });
+  const { req, res, next } = await fixture.authenticate();
+  assert.deepEqual(res.status.mock.calls[0].arguments, [503]);
+  assert.deepEqual(res.json.mock.calls[0].arguments[0], { error: 'Your invited account is still being prepared. Retry shortly.', code: 'ACCOUNT_SETUP_PENDING', retryAfterSeconds: 1 });
+  assert.equal(req.auth, undefined);
+  assert.equal(next.mock.calls.length, 0);
+  assert.equal(fixture.query.mock.calls.length, 0, 'a pending invitation never reaches protected account or clinical storage');
+});
+
+for (const role of ['unsupported-role', '', null] as const) test(`an explicitly invalid trusted role (${String(role)}) stays a permanent 403 on a recent invitation`, async () => {
+  const fixture = await invitationProvisioningFixture({ invitedAt: new Date(Date.now() - 1000).toISOString(), role });
+  const { req, res, next } = await fixture.authenticate();
+  assert.deepEqual(res.status.mock.calls[0].arguments, [403]);
+  assert.equal((res.json.mock.calls[0].arguments[0] as { code?: string }).code, undefined);
+  assert.equal(req.auth, undefined);
+  assert.equal(next.mock.calls.length, 0);
+});
+
+for (const [name, options] of [
+  ['old invitation', { invitedAt: new Date(Date.now() - 130000).toISOString() }],
+  ['future invitation marker', { invitedAt: new Date(Date.now() + 60000).toISOString() }],
+  ['invalid invitation marker', { invitedAt: 'invalid' }],
+  ['public signup without a provider invitation', { createdAt: new Date().toISOString() }],
+  ['client-forged invitation metadata', { userMetadata: { invited_at: new Date().toISOString(), clinic_role: 'admin' } }],
+] as const) test(`${name} cannot use invitation provisioning grace`, async () => {
+  const fixture = await invitationProvisioningFixture(options);
+  const { req, res, next } = await fixture.authenticate();
+  assert.deepEqual(res.status.mock.calls[0].arguments, [403]);
+  assert.equal(req.auth, undefined);
+  assert.equal(next.mock.calls.length, 0);
+});
+
+test('an unconfirmed recent invite still requires email confirmation', async () => {
+  const fixture = await invitationProvisioningFixture({ invitedAt: new Date(Date.now() - 1000).toISOString(), confirmed: false });
+  const { req, res, next } = await fixture.authenticate();
+  assert.deepEqual(res.status.mock.calls[0].arguments, [403]);
+  assert.equal((res.json.mock.calls[0].arguments[0] as { code?: string }).code, 'EMAIL_CONFIRMATION_REQUIRED');
+  assert.equal(req.auth, undefined);
+  assert.equal(next.mock.calls.length, 0);
+});
+
+test('a preserved invite retry succeeds only after the provider trusted role and profile have been provisioned', async () => {
+  const fixture = await invitationProvisioningFixture({ invitedAt: new Date(Date.now() - 1000).toISOString(), profilePresent: false });
+  const initial = await fixture.authenticate();
+  assert.equal(initial.req.auth, undefined);
+  assert.deepEqual(initial.res.status.mock.calls[0].arguments, [503]);
+  fixture.ready();
+  const complete = await fixture.authenticate();
+  assert.equal(complete.next.mock.calls.length, 1);
+  assert.equal(complete.req.auth?.role, 'doctor');
+  assert.equal(complete.req.auth?.sessionId, sessionId);
+  assert.equal(complete.req.auth?.email, 'test@spu.ac.za');
 });
 
 for (const { status, code } of [

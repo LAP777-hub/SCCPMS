@@ -88,7 +88,7 @@ The server validates the Supabase session, confirmed email, trusted role and act
 | Admin | Patient/staff account management, doctor/receptionist invitations, doctor directory, clinic policies, appointment oversight, leave approvals, reports and audit records |
 | Receptionist | Patient registration/intake, walk-in queue, scheduling assistance and front-desk operations |
 
-Students register with a student number and matching `studentnumber@spu.ac.za` email, faculty/programme, and residential address. Other university users use their school email. The existing admin may use a personal email. Doctors and receptionists are created by the admin and receive invitation links to choose their own password. Profile identity details are stored and validated; external university enrolment/identity integration remains separate work.
+All roles can use any valid email address, including personal and university mailboxes. Students still register with a student number, faculty/programme, and residential address; their email need not match the student number. Doctors and receptionists are created by the admin and receive invitation links to choose their own password. Profile identity details are stored and validated; external university enrolment/identity integration remains separate work.
 
 Appointment and clinical data come from the database. Empty datasets produce zero totals and empty states. Scheduling uses clinic hours, timezone and booking policies, and rejects invalid/conflicting slots. Clinical history and audit records are retained when account access is suspended.
 
@@ -108,7 +108,7 @@ The read-only checker distinguishes HTTP/CORS failures from PostgreSQL connectiv
 
 Supabase sends confirmation, invitation and password-reset emails. Resend sends the additional login OTP through the API. Both channels need verified production mail configuration. [Account email links](docs/auth-email-links.md) explains the callback markers and password-setup flow.
 
-The university sender `clinic.spu.ac.za` remains pending DNS verification. University IT must approve and publish [the prepared DNS records](RESEND_UNIVERSITY_DNS.md). The `onboarding@resend.dev` test sender is limited to the Resend account owner and is refused in production. A real received OTP and invitation/confirmation flow still require live acceptance after DNS and SMTP configuration.
+The university sender `clinic.spu.ac.za` remains pending DNS verification. SPU has been asked to help with a subdomain; IT can publish [the prepared DNS records](RESEND_UNIVERSITY_DNS.md) without granting DNS access. A separately owned verified sender domain also works with university recipients. See [production email setup](docs/email-delivery.md) for the guarded SMTP/template runner, ten-minute OTPs and live acceptance requirements.
 
 Read-only sender checks are available from a securely configured environment:
 

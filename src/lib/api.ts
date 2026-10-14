@@ -3,8 +3,17 @@ import { currentAuthSession, refreshRejectedSession, sameAuthSession, sessionReq
 
 const apiUrl = import.meta.env.VITE_API_URL;
 
+export type OtpChallengeMetadata = { destination?: string; expiresAt?: string; expiresInSeconds?: number };
+type OtpErrorMetadata = { retryAfterSeconds?: number; activeChallenge?: OtpChallengeMetadata | null };
+
 export class ApiError extends Error {
-  constructor(message: string, public status: number, public code?: string) { super(message); }
+  readonly retryAfterSeconds?: number;
+  readonly activeChallenge?: OtpChallengeMetadata | null;
+  constructor(message: string, public status: number, public code?: string, metadata: OtpErrorMetadata = {}) {
+    super(message);
+    this.retryAfterSeconds = metadata.retryAfterSeconds;
+    this.activeChallenge = metadata.activeChallenge;
+  }
 }
 
 export async function authenticatedFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -45,10 +54,10 @@ export async function authenticatedFetch(path: string, init: RequestInit = {}): 
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await authenticatedFetch(path, init);
-  const payload = await response.json().catch(() => null) as { error?: string; code?: string; details?: { fieldErrors?: Record<string, string[]> } } | null;
+  const payload = await response.json().catch(() => null) as ({ error?: string; code?: string; details?: { fieldErrors?: Record<string, string[]> } } & OtpErrorMetadata) | null;
   if (!response.ok) {
     const details = Object.entries(payload?.details?.fieldErrors || {}).flatMap(([field, messages]) => messages.map(message => `${field}: ${message}`)).join(' ');
-    throw new ApiError([payload?.error || `API request failed (${response.status}).`, details].filter(Boolean).join(' '), response.status, payload?.code);
+    throw new ApiError([payload?.error || `API request failed (${response.status}).`, details].filter(Boolean).join(' '), response.status, payload?.code, payload ?? {});
   }
   if (init.method && !['GET', 'HEAD'].includes(init.method.toUpperCase())) window.dispatchEvent(new CustomEvent('clinic:data-changed', { detail: { path } }));
   return payload as T;

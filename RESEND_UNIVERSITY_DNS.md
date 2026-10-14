@@ -4,7 +4,7 @@ Prepared on 12 October 2026 from this Resend account. Provider status: **not_sta
 
 This is a request for the university IT/DNS administrators to approve and add the following records under the university's domain. No university DNS records have been changed by this project. Sending is enabled; inbound receiving is disabled. Open and click tracking are disabled; TLS is enforced.
 
-Proposed sender after verification: `SCCPMS <login@clinic.spu.ac.za>`. University users continue using their `@spu.ac.za` accounts.
+Proposed sender after verification: `SCCPMS <login@clinic.spu.ac.za>`. Users may use any valid recipient email address, including personal or university accounts.
 
 | Purpose | Type | Full hostname | Value | Priority | TTL |
 | --- | --- | --- | --- | --- | --- |

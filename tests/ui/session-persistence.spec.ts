@@ -315,6 +315,8 @@ test('a delayed verification error cannot revoke a fresh OTP for the same user a
   await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
   clinic.state.otpRequiredPaths.clear();
   clinic.state.patients = 7;
+  await expect(page.getByRole('button', { name: 'Verify & Sign In' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Resend code', exact: true }).click();
   await page.getByLabel('6-Digit Code').fill('123456');
   await page.getByRole('button', { name: 'Verify & Sign In' }).click();
   await expect(page.getByRole('heading', { name: 'Clinic Overview' })).toBeVisible();

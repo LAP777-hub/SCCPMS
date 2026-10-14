@@ -42,7 +42,7 @@ async function openRegistration(page: Page, options: { addressUnavailable?: bool
 
 async function fillIdentity(page: Page) {
   await page.getByLabel('Full name').fill('University Student');
-  await page.getByLabel('University email').fill('2014000001@spu.ac.za');
+  await page.getByLabel('Email address').fill('2014000001@spu.ac.za');
   await page.getByLabel('Phone (international format)').fill('+27123456789');
   await page.getByLabel('Student number').fill('2014000001');
   await page.getByLabel('Password (at least 10 characters)').fill('testing-password');

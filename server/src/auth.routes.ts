@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { config } from './config.js';
 import { requireAuth } from './auth.js';
 import { pool } from './db.js';
-import { refinePatientIdentity, universityEmailSchema } from './university-policy.js';
+import { refinePatientIdentity, accountEmailSchema } from './university-policy.js';
 import { phoneSchema } from './phone.js';
 import academicCatalogue from './academic-catalogue.json' with { type: 'json' };
 import { authCallbackUrl } from './auth-callback.js';
@@ -26,7 +26,7 @@ router.post('/logout', requireAuth, async (req, res) => {
 });
 
 export const registrationSchema = z.object({
-  email: universityEmailSchema,
+  email: accountEmailSchema,
   password: z.string().min(10).max(128),
   fullName: z.string().trim().min(2).max(160),
   phone: phoneSchema,

@@ -9,6 +9,8 @@ import PatientDashboard from './components/PatientDashboard';
 import ReceptionistDashboard from './components/ReceptionistDashboard';
 import PasswordRecoveryScreen from './components/PasswordRecoveryScreen';
 import RegistrationScreen from './components/RegistrationScreen';
+import ConfirmationLinkScreen from './components/ConfirmationLinkScreen';
+import { pendingEmailConfirmation } from './lib/emailConfirmation';
 
 type View = 'register' | 'login';
 
@@ -82,6 +84,8 @@ function PortalContent() {
 }
 
 function App() {
+  const [confirmation] = useState(() => pendingEmailConfirmation(window.location.href, import.meta.env.VITE_SUPABASE_URL));
+  if (confirmation) return <ConfirmationLinkScreen confirmation={confirmation} />;
   return (
     <AuthProvider>
       <PortalContent />

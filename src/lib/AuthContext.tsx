@@ -1,13 +1,22 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import { supabase, type Profile, type Role } from './supabase';
-import { apiRequest, ApiError } from './api';
+import { isAuthApiError, isAuthRetryableFetchError, type Session } from '@supabase/supabase-js';
+import { supabase, clearStoredAuthSession, type Profile, type Role } from './supabase';
+import { apiRequest, ApiError, type OtpChallengeMetadata } from './api';
 import { connectClinicUpdates } from './realtime';
 import { invalidateSessionRequests, sameAuthSession, sessionRequestVersion, SessionUnavailableError } from './session';
 import { authCallback, authSessionId, scrubAuthCallback, type AuthCallbackAction } from './authCallback';
+import { AUTH_TIMEOUT_MESSAGE } from './authFetch';
 
 type PasswordSetup = { kind: 'recovery' | 'invite'; userId: string; sessionId: string };
+type SignInHint = { email: string; role: Role };
 const passwordSetupKey = 'sccpms:password-setup';
+const callbackUnavailableMessage = 'The account service is unavailable right now. Check your connection and try again. If this one-use email link was already consumed, use Forgot password to request a fresh account link.';
+
+function unavailableAuthService(error: unknown) {
+  return isAuthRetryableFetchError(error)
+    || (isAuthApiError(error) && error.status >= 500)
+    || (error instanceof Error && error.message === AUTH_TIMEOUT_MESSAGE);
+}
 
 function callbackFailure(kind: AuthCallbackAction | null = authCallback.action) {
   if (kind === 'invite') return 'This invitation link has expired or is invalid. Ask the clinic administrator to resend your invitation.';
@@ -55,6 +64,11 @@ type AuthState = {
   pendingOtpEmail: string | null;
   otpError: string;
   otpNotice: string;
+  otpSending: boolean;
+  otpChallengeReady: boolean;
+  otpExpiresAt: number | null;
+  otpRetryAt: number | null;
+  signInHint: SignInHint | null;
   passwordRecoveryRequired: boolean;
   invitationSetupRequired: boolean;
   authCallbackError: string;
@@ -105,6 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [pendingOtpEmail, setPendingOtpEmail] = useState<string | null>(null);
   const [otpError, setOtpError] = useState('');
   const [otpNotice,setOtpNotice] = useState('');
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpChallengeReady, setOtpChallengeReady] = useState(false);
+  const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
+  const [otpRetryAt, setOtpRetryAt] = useState<number | null>(null);
+  const [signInHint, setSignInHint] = useState<SignInHint | null>(null);
   const verificationVersion = useRef(0);
   const signInAttempt = useRef(0);
   const setup = useRef(authCallback.hasError ? null : savedPasswordSetup());
@@ -124,6 +143,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const accountOtpEmail = useRef<string | null>(null);
   const authenticatedUserId = session?.user.id ?? null;
   const authenticatedSessionId = session ? authSessionId(session.access_token) ?? session.access_token : null;
+
+  const resetOtpChallenge = useCallback(() => {
+    setOtpSending(false);
+    setOtpChallengeReady(false);
+    setOtpExpiresAt(null);
+    setOtpRetryAt(null);
+  }, []);
+
+  const applyOtpChallenge = useCallback((challenge: OtpChallengeMetadata) => {
+    const absoluteExpiry = challenge.expiresAt ? Date.parse(challenge.expiresAt) : NaN;
+    const seconds = challenge.expiresInSeconds;
+    const expiry = Number.isFinite(absoluteExpiry) ? absoluteExpiry
+      : typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0
+        ? Date.now() + seconds * 1000 : null;
+    setOtpChallengeReady(expiry === null || expiry > Date.now());
+    setOtpExpiresAt(expiry);
+    if (challenge.destination) setPendingOtpEmail(challenge.destination);
+  }, []);
+
+  const applyOtpRetry = useCallback((seconds: number | undefined) => {
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) return;
+    setOtpRetryAt(seconds > 0 ? Date.now() + Math.min(seconds, 3600) * 1000 : null);
+  }, []);
 
   const suspendAccount = useCallback(() => {
     if (suspensionShown.current) return;
@@ -147,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPendingOtpEmail(null);
     setOtpError('');
     setOtpNotice('');
+    resetOtpChallenge();
     setPasswordRecoveryRequired(false);
     setInvitationSetupRequired(false);
     setAuthCallbackError('');
@@ -155,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
     // Keep the reason visible after SIGNED_OUT removes cached credentials.
     void supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
-  }, []);
+  }, [resetOtpChallenge]);
 
   const refreshProfile = useCallback(async () => {
     const expectedSession = currentSession.current;
@@ -202,11 +245,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPendingOtpUserId(currentUserId.current);
       setPendingOtpEmail(accountOtpEmail.current);
       setOtpNotice('');
+      resetOtpChallenge();
       setOtpError('Your email verification has expired. Request a new code to continue.');
     };
     window.addEventListener('clinic:otp-required', requireVerification);
     return () => window.removeEventListener('clinic:otp-required', requireVerification);
-  }, []);
+  }, [resetOtpChallenge]);
 
   useEffect(() => {
     let active = true;
@@ -228,13 +272,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         && (authCallback.accessToken
           ? Boolean(authSessionId(authCallback.accessToken)) && authSessionId(authCallback.accessToken) === authSessionId(restored!.access_token)
           : exchangedCode);
+      const callbackServiceUnavailable = !authCallback.hasError
+        && (unavailableAuthService(initialization.error) || unavailableAuthService(error));
       if (authCallback.present && !callbackSucceeded) {
-        setAuthCallbackError(callbackFailure());
+        setAuthCallbackError(callbackServiceUnavailable ? callbackUnavailableMessage : callbackFailure());
         setup.current = null;
         storePasswordSetup(null);
       }
       if (!restored) {
-        if (setup.current) setAuthCallbackError(callbackFailure(setup.current.kind));
+        if (setup.current) setAuthCallbackError(callbackServiceUnavailable ? callbackUnavailableMessage : callbackFailure(setup.current.kind));
         storePasswordSetup(null);
         setup.current = null;
         setLoading(false);
@@ -274,9 +320,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (action === 'signup') {
             // Registration already collected a password. Confirmation returns
             // to credentials; it does not skip the separate email OTP check.
+            const attempt = signInAttempt.current;
             const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
-            if (signOutError) throw signOutError;
-            if (!active) return;
+            if (!active || attempt !== signInAttempt.current || (currentSession.current && !sameAuthSession(restored, currentSession.current))) return;
+            if (signOutError) {
+              clearStoredAuthSession();
+              currentSession.current = null;
+              currentUserId.current = null;
+              setSession(null);
+              setProfile(null);
+            }
+            setSignInHint({ email: trusted.email, role: ['student', 'lecturer', 'staff'].includes(trusted.role) ? 'patient' : trusted.role });
             setAuthCallbackNotice('Your email is confirmed. Sign in with your password, then enter the email verification code to open your dashboard.');
             setLoading(false);
             return;
@@ -326,14 +380,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const version = verificationVersion.current;
       setPendingOtpUserId(restored.user.id);
-      void apiRequest<{ verified: boolean }>('/auth/otp/status')
-        .then(({ verified }) => {
+      void apiRequest<{ verified: boolean; activeChallenge?: OtpChallengeMetadata | null; retryAfterSeconds?: number }>('/auth/otp/status')
+        .then(({ verified, activeChallenge, retryAfterSeconds }) => {
           if (!active || version !== verificationVersion.current || !sameAuthSession(restored, currentSession.current)) return;
           setOtpVerified(verified);
           if (verified) setPendingOtpUserId(null);
+          else if (activeChallenge) applyOtpChallenge(activeChallenge);
+          else { setOtpChallengeReady(false); setOtpExpiresAt(null); }
+          applyOtpRetry(retryAfterSeconds);
           // A concurrent profile failure must remain visible when this later
           // verification-status response succeeds.
-          setOtpError(currentError => currentError || (verified ? '' : 'Request a verification code to continue.'));
+          setOtpError(currentError => currentError || (verified || activeChallenge ? '' : 'Request a verification code to continue.'));
         })
         .catch((failure: unknown) => { if (active && version === verificationVersion.current) setOtpError(failure instanceof Error ? failure.message : 'Unable to check email verification.'); });
     })().catch((error: unknown) => {
@@ -365,6 +422,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         invitationMode.current = false;
         setPasswordRecoveryRequired(false);
         setInvitationSetupRequired(false);
+        resetOtpChallenge();
       }
       currentSession.current = newSession;
       currentUserId.current = newSession?.user.id ?? null;
@@ -378,6 +436,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setOtpVerified(false);
         setLoading(false);
+        resetOtpChallenge();
         if (event === 'SIGNED_OUT') {
           setAuthCallbackRetry(false);
           callbackAccount.current = null;
@@ -392,7 +451,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
-  }, []);
+  }, [applyOtpChallenge, applyOtpRetry, resetOtpChallenge]);
 
   useEffect(() => {
     let cancelled = false;
@@ -437,6 +496,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthCallbackNotice('');
     setAuthCallbackRetry(false);
     setOtpNotice('');
+    resetOtpChallenge();
+    setSignInHint(null);
     verificationVersion.current += 1;
     setOtpVerified(false);
     setProfile(null);
@@ -527,20 +588,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const expectedSession = currentSession.current;
     const version = sessionRequestVersion();
     const isCurrent = () => version === sessionRequestVersion() && sameAuthSession(expectedSession, currentSession.current);
-    setOtpNotice('');
+    setOtpSending(true);
     try {
-      const result = await apiRequest<{ message?: string; deliveryMode?: 'email'; destination?: string; expiresInSeconds?: number }>('/auth/otp/send', { method: 'POST' });
+      const result = await apiRequest<{ message?: string; deliveryMode?: 'email'; retryAfterSeconds?: number } & OtpChallengeMetadata>('/auth/otp/send', { method: 'POST' });
       if (!isCurrent()) return { error: null };
-      if (result.destination) setPendingOtpEmail(result.destination);
+      verificationVersion.current += 1;
+      applyOtpChallenge(result);
+      applyOtpRetry(result.retryAfterSeconds);
       setOtpNotice(result.message || 'A verification code was sent to your account email.');
       setOtpError('');
       return { error: null };
     } catch (error) {
       if (!isCurrent()) return { error: null };
+      if (error instanceof ApiError) {
+        applyOtpRetry(error.retryAfterSeconds);
+        if (error.activeChallenge !== undefined) {
+          verificationVersion.current += 1;
+          if (error.activeChallenge) applyOtpChallenge(error.activeChallenge);
+          else {
+            setOtpChallengeReady(false);
+            setOtpExpiresAt(null);
+            setOtpNotice('');
+          }
+        }
+      }
       const message = error instanceof Error ? error.message : 'Unable to send verification code.';
       setOtpError(message);
       return { error: message };
-    }
+    } finally { if (isCurrent()) setOtpSending(false); }
   };
 
   const requestPasswordReset: AuthState['requestPasswordReset'] = async (email) => {
@@ -571,6 +646,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setup.current = null;
     recoveryMode.current = false;
     invitationMode.current = false;
+    setSignInHint({ email: profile.email, role: ['student', 'lecturer', 'staff'].includes(profile.role) ? 'patient' : profile.role });
     return { error: null };
   };
 
@@ -593,10 +669,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPendingOtpUserId(null);
       setPendingOtpEmail(null);
       setOtpVerified(true);
+      resetOtpChallenge();
       setOtpError('');
       return { error: null };
     } catch (error) {
       if (!isCurrent()) return { error: null };
+      if (error instanceof ApiError && [404, 410, 429].includes(error.status)) {
+        setOtpChallengeReady(false);
+        setOtpExpiresAt(error.status === 410 ? Date.now() : null);
+      }
       return { error: error instanceof Error ? error.message : 'Unable to verify this code.' };
     }
   };
@@ -604,22 +685,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cancelOtp: AuthState['cancelOtp'] = async () => {
     signInAttempt.current += 1;
     invalidateSessionRequests();
-    await supabase.auth.signOut();
+    const expectedSession = currentSession.current;
+    const attempt = signInAttempt.current;
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (attempt !== signInAttempt.current || (currentSession.current && !sameAuthSession(expectedSession, currentSession.current))) return;
+    if (error) {
+      clearStoredAuthSession();
+      currentSession.current = null;
+      currentUserId.current = null;
+      setSession(null);
+      setProfile(null);
+    }
     setPendingOtpUserId(null);
     setPendingOtpEmail(null);
     setOtpVerified(false);
     setOtpError('');
+    setOtpNotice('');
+    resetOtpChallenge();
   };
 
   const signOut: AuthState['signOut'] = async () => {
     signInAttempt.current += 1;
     invalidateSessionRequests();
-    await apiRequest('/auth/logout', { method: 'POST' }).catch(() => undefined);
-    await supabase.auth.signOut();
+    const expectedSession = currentSession.current;
+    const attempt = signInAttempt.current;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 3000);
+    try { await apiRequest('/auth/logout', { method: 'POST', signal: controller.signal }).catch(() => undefined); }
+    finally { window.clearTimeout(timeout); }
+    if (attempt !== signInAttempt.current || (currentSession.current && !sameAuthSession(expectedSession, currentSession.current))) return;
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (attempt !== signInAttempt.current || (currentSession.current && !sameAuthSession(expectedSession, currentSession.current))) return;
+    if (error) clearStoredAuthSession();
+    currentSession.current = null;
+    currentUserId.current = null;
+    setSession(null);
     setProfile(null);
     setPendingOtpUserId(null);
     setPendingOtpEmail(null);
     setOtpVerified(false);
+    setOtpNotice('');
+    setOtpError('');
+    resetOtpChallenge();
     setPasswordRecoveryRequired(false);
     setInvitationSetupRequired(false);
     recoveryMode.current = false;
@@ -631,7 +738,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       session, profile, loading: loading || checkingCallback, otpVerified, passwordRecoveryRequired, invitationSetupRequired, authCallbackError, authCallbackNotice, authCallbackRetry, accountSuspended, refreshProfile,
-      pendingOtpUserId, pendingOtpEmail, otpError, otpNotice,
+      pendingOtpUserId, pendingOtpEmail, otpError, otpNotice, otpSending, otpChallengeReady, otpExpiresAt, otpRetryAt, signInHint,
       signIn, signUp, sendOtp, requestPasswordReset, completePasswordRecovery, verifyOtp, cancelOtp, signOut,
     }}>
       {children}

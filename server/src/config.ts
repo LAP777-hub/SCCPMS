@@ -15,9 +15,10 @@ const schema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   OTP_HMAC_SECRET: z.string().min(32),
+  OTP_VALIDITY_SECONDS: z.coerce.number().int().min(120).max(900).default(600),
+  OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(300).default(30),
   RESEND_API_KEY: z.string().trim().default(''),
   RESEND_FROM_EMAIL: z.string().trim().default('SCCPMS <onboarding@resend.dev>'),
-  UNIVERSITY_EMAIL_DOMAINS: z.string().default('spu.ac.za'),
   // Photon permits search-as-you-type; its public demo is for modest traffic only.
   ADDRESS_PHOTON_URL: z.string().url().default('https://photon.komoot.io/api/'),
   ADDRESS_SEARCH_INTERVAL_MS: z.coerce.number().int().min(1000).default(1100),
