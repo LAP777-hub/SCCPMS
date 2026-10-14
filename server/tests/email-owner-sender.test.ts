@@ -82,6 +82,31 @@ test('a configured owner without authorization context still uses only the prima
   assert.equal(JSON.parse(String(fixture.calls[0].init.body)).from, primarySender);
 });
 
+test('removing the cancelled primary domain preserves real delivery to the authorized owner', async () => {
+  const settings = { ...configured, RESEND_FROM_EMAIL: '' };
+  assert.equal(selectOtpEmailSender(owner, settings), OWNER_OTP_SENDER);
+  const fixture = provider();
+  const delivered = await sendOtpEmail(ownerEmail, '123456', challengeId, settings, 600, fixture.transport, owner);
+  assert.equal(delivered.messageId, messageId);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(JSON.parse(String(fixture.calls[0].init.body)).from, OWNER_OTP_SENDER);
+});
+
+test('an unset primary sender does not broaden the owner exception or attempt general email delivery', async () => {
+  const settings = { ...configured, RESEND_FROM_EMAIL: '' };
+  for (const context of [
+    undefined,
+    { ...owner, userId: otherId },
+    { ...owner, email: 'other@gmail.com' },
+    ...['patient', 'doctor', 'receptionist'].map(role => ({ ...owner, role })),
+  ]) {
+    const fixture = provider();
+    if (context) assert.equal(selectOtpEmailSender(context, settings), '');
+    await assert.rejects(sendOtpEmail(ownerEmail, '123456', challengeId, settings, 600, fixture.transport, context), { reason: 'configuration' });
+    assert.equal(fixture.calls.length, 0);
+  }
+});
+
 for (const [name, context, destination] of [
   ['another user UUID', { ...owner, userId: otherId }, ownerEmail],
   ['another admin email', { ...owner, email: 'other@gmail.com' }, ownerEmail],

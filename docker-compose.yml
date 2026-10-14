@@ -15,8 +15,10 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?Set SUPABASE_SERVICE_ROLE_KEY}
       OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?Set OTP_HMAC_SECRET}
       RESEND_API_KEY: ${RESEND_API_KEY:?Set the full Resend API key}
-      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:?Set a mailbox at a verified custom Resend sending domain}
-      UNIVERSITY_EMAIL_DOMAINS: spu.ac.za
+      # Blank primary sender permits only the complete bound owner-admin route.
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      RESEND_ADMIN_OWNER_EMAIL: ${RESEND_ADMIN_OWNER_EMAIL:-}
+      RESEND_ADMIN_OWNER_USER_ID: ${RESEND_ADMIN_OWNER_USER_ID:-}
       # Dedicated Photon service for sustained production autocomplete.
       ADDRESS_PHOTON_URL: ${ADDRESS_PHOTON_URL:-https://photon.komoot.io/api/}
       ADDRESS_SEARCH_INTERVAL_MS: ${ADDRESS_SEARCH_INTERVAL_MS:-1100}

@@ -85,7 +85,7 @@ function fixture(failAuditOnce = false) {
 
 test('the production owner administrator commits its bound sender and provider acknowledgement using isolated fixtures', async () => {
   const ownerEmail = 'admin.owner.fixture@gmail.com';
-  Object.assign(config, { RESEND_ADMIN_OWNER_EMAIL: ownerEmail, RESEND_ADMIN_OWNER_USER_ID: userId });
+  Object.assign(config, { RESEND_FROM_EMAIL: '', RESEND_ADMIN_OWNER_EMAIL: ownerEmail, RESEND_ADMIN_OWNER_USER_ID: userId });
   const database = fixture();
   let sent: { from: string; to: string[]; text: string } | undefined;
   mock.method(globalThis, 'fetch', async (_input: unknown, init?: RequestInit) => {
@@ -103,6 +103,24 @@ test('the production owner administrator commits its bound sender and provider a
   assert.equal(database.audits, 1);
   assert.ok(result.body.expiresInSeconds >= 599 && result.body.expiresInSeconds <= 600);
   assert.equal(Object.hasOwn(result.body, 'code'), false);
+});
+
+test('an unset primary sender preserves accepted codes without reserving a challenge or contacting Resend', async () => {
+  Object.assign(config, { RESEND_FROM_EMAIL: '', RESEND_ADMIN_OWNER_EMAIL: 'admin.owner.fixture@gmail.com', RESEND_ADMIN_OWNER_USER_ID: userId });
+  const database = fixture();
+  const provider = mock.method(globalThis, 'fetch', async () => { throw new Error('Unconfigured mail must not reach the provider'); });
+  const { result, res } = response();
+  await send(request(), res);
+  assert.equal(result.status, 503);
+  assert.equal(result.body.code, 'OTP_EMAIL_UNAVAILABLE');
+  assert.match(result.body.error, /not configured/);
+  assert.equal(result.body.activeChallenge.expiresAt, database.originalExpiry.toISOString());
+  assert.equal(database.oldConsumed, false);
+  assert.equal(database.draft, null);
+  assert.equal(database.audits, 0);
+  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(database.statements.length, 1);
+  assert.ok(database.statements[0].sql.includes('AS verified'));
 });
 
 test('a rejected sender preserves the old accepted code and offers a short, safe retry', async () => {

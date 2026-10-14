@@ -58,9 +58,15 @@ router.post('/send', async (req, res) => {
   if (!emailHash) return otpResponse(res, 422, { error: 'A confirmed email address is required on your account. Contact the clinic administrator.' });
 
   const identity = { userId, sessionId, emailHash };
+  const selectedSender = selectOtpEmailSender(req.auth!);
+  if (!selectedSender) {
+    // Missing general-mail setup must not insert an invalid sender or consume
+    // the account's hourly challenge budget. Keep any accepted code usable.
+    return otpProblem(res, 503, 'OTP_EMAIL_UNAVAILABLE', 'Email verification is not configured. Contact the clinic administrator.', 2, identity, email);
+  }
   let lease: OtpLease;
   try {
-    lease = await reserveOtpChallenge(pool, identity, selectOtpEmailSender(req.auth!));
+    lease = await reserveOtpChallenge(pool, identity, selectedSender);
   } catch (error) {
     if (error instanceof OtpChallengeError) {
       const message = error.code === 'OTP_HOURLY_LIMIT'

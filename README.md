@@ -106,11 +106,11 @@ npm --prefix server run connections:check
 
 The read-only checker distinguishes HTTP/CORS failures from PostgreSQL connectivity. The recorded university-network incident blocked PostgreSQL TCP access while Supabase HTTPS remained healthy. See [the connection diagnostic](docs/session-connectivity.md); changing Auth redirect URLs does not repair that database connection.
 
-Supabase sends confirmation, invitation and password-reset emails. Resend sends the additional login OTP through the API. Both channels need verified production mail configuration. [Account email links](docs/auth-email-links.md) explains the callback markers and password-setup flow.
+Supabase sends confirmation, invitation and password-reset emails. Resend sends the additional login OTP through the API. General delivery needs a verified sender and Supabase custom SMTP; custom SMTP is still absent. Supabase's default mail service accepts only project-team recipients. [Account email links](docs/auth-email-links.md) explains the callback markers and password-setup flow.
 
-The university sender `clinic.spu.ac.za` remains pending DNS verification. SPU has been asked to help with a subdomain; IT can publish [the prepared DNS records](RESEND_UNIVERSITY_DNS.md) without granting DNS access. A separately owned verified sender domain also works with university recipients. See [production email setup](docs/email-delivery.md) for the guarded SMTP/template runner, ten-minute OTPs and live acceptance requirements.
+The SPU sender setup was canceled on **14 October 2026**. Leave `RESEND_FROM_EMAIL` unset or empty until a replacement domain you own is verified in Resend. [The previous DNS handoff](RESEND_UNIVERSITY_DNS.md) is historical and optional; SPU DNS is no longer an active requirement. A verified replacement sender can deliver to any valid recipient domain. See [production email setup](docs/email-delivery.md) for the guarded SMTP/template runner, ten-minute OTPs and live acceptance requirements.
 
-The existing administrator has a temporary real-OTP route through Resend's owner-only sender, bound to the confirmed owner's exact account ID, role and email. Other accounts continue using the main sender. This restores administrator mail access while the verified clinic sender is pending; it does not configure general signup/invitation SMTP.
+The existing administrator retains a temporary real-OTP route through Resend's owner-only sender, bound to the confirmed owner's exact account ID, role and email. Production can start with an empty primary sender only when both owner settings are valid. Other accounts receive a safe delivery-unavailable response until a verified replacement sender is configured. This route does not configure general signup, invitation or recovery SMTP, and does not relax email confirmation, trusted roles or OTP verification.
 
 Read-only sender checks are available from a securely configured environment:
 

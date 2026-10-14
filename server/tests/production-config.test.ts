@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { config, configSchema } from '../src/config.js';
 
-const production = { ...config, NODE_ENV: 'production', FRONTEND_ORIGIN: 'https://clinic.example.invalid', DATABASE_SSL_MODE: 'verify-full', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>' };
+const production = { ...config, NODE_ENV: 'production', FRONTEND_ORIGIN: 'https://clinic.example.invalid', DATABASE_SSL_MODE: 'verify-full', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>', RESEND_ADMIN_OWNER_EMAIL: '', RESEND_ADMIN_OWNER_USER_ID: '' };
 test('production accepts Resend credentials, a custom-domain sender, exact HTTPS origin and certificate-verified database', () => {
   assert.equal(configSchema.safeParse(production).success, true);
 });
@@ -15,6 +15,24 @@ test('owner-only delivery requires a complete valid account binding and cannot m
     { ...owner, RESEND_ADMIN_OWNER_EMAIL: 'invalid-address' }, { ...owner, RESEND_ADMIN_OWNER_USER_ID: 'not-a-uuid' },
     { ...owner, RESEND_FROM_EMAIL: 'SCCPMS <onboarding@resend.dev>' },
   ]) assert.equal(configSchema.safeParse({ ...production, ...changes }).success, false);
+});
+
+test('an absent primary sender permits only the explicitly configured owner bootstrap', () => {
+  const owner = { RESEND_ADMIN_OWNER_EMAIL: 'admin.owner.fixture@gmail.com', RESEND_ADMIN_OWNER_USER_ID: '00000000-0000-4000-8000-000000000081' };
+  for (const RESEND_FROM_EMAIL of ['', '   ', undefined]) {
+    const parsed = configSchema.safeParse({ ...production, ...owner, RESEND_FROM_EMAIL });
+    assert.equal(parsed.success, true);
+    if (parsed.success) assert.equal(parsed.data.RESEND_FROM_EMAIL, '');
+    for (const incomplete of [
+      { RESEND_ADMIN_OWNER_EMAIL: '', RESEND_ADMIN_OWNER_USER_ID: '' },
+      { ...owner, RESEND_ADMIN_OWNER_EMAIL: '' },
+      { ...owner, RESEND_ADMIN_OWNER_USER_ID: '' },
+      { ...owner, RESEND_ADMIN_OWNER_USER_ID: 'not-a-uuid' },
+      { ...owner, RESEND_ADMIN_OWNER_EMAIL: 'invalid-address' },
+    ]) assert.equal(configSchema.safeParse({ ...production, ...incomplete, RESEND_FROM_EMAIL }).success, false);
+  }
+  assert.equal(configSchema.safeParse({ ...production, ...owner, RESEND_FROM_EMAIL: '', RESEND_API_KEY: '' }).success, false);
+  assert.equal(configSchema.safeParse({ ...production, ...owner, RESEND_FROM_EMAIL: '', DATABASE_SSL_MODE: 'disable' }).success, false);
 });
 for (const [name, changes] of [
   ['missing Resend API key', { RESEND_API_KEY: '' }],

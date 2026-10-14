@@ -37,28 +37,26 @@ full key has now been installed and accepted by Resend's read-only domain API.
 Development can start without a key; requesting a code fails safely until
 delivery is configured. Restart the API after changing its environment file.
 
-The default development sender is `SCCPMS <onboarding@resend.dev>`. Resend limits
-that test domain to the email address associated with the Resend account. To send
-to university users, set `RESEND_FROM_EMAIL` to a mailbox at a custom domain you
-own and have verified in Resend. Production requires a full key and custom sender.
+The primary sender is intentionally unset until a replacement custom domain is
+verified. Leave `RESEND_FROM_EMAIL` unset or empty. Production requires a full
+key and either a valid custom sender or the complete temporary owner-admin
+binding. `RESEND_ADMIN_OWNER_EMAIL` and `RESEND_ADMIN_OWNER_USER_ID` must identify
+the existing confirmed, active administrator and the Resend account email.
+Only that exact account can receive a real OTP from
+`SCCPMS <onboarding@resend.dev>`; no global test sender is enabled. Other accounts
+receive a safe delivery-unavailable response while the primary sender is empty.
+For general delivery, set `RESEND_FROM_EMAIL` to a mailbox at a custom domain you
+own and have verified in Resend. Recipients may use any valid email domain.
 See [Resend test-domain restrictions](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain)
 and [domain verification](https://resend.com/docs/dashboard/domains/introduction).
 
-The requested university sender `clinic.spu.ac.za` has been added to this Resend
-account with sending enabled, receiving disabled, tracking disabled and enforced
-TLS. It remains unverified. [RESEND_UNIVERSITY_DNS.md](RESEND_UNIVERSITY_DNS.md)
-contains the actual DNS records for university IT to approve and publish.
-University DNS was not changed. The local sender remains the owner-only test
-sender until the university completes verification. After verification, set
-`RESEND_FROM_EMAIL="SCCPMS <login@clinic.spu.ac.za>"`, run the production email
-check and restart the API. To regenerate the provider record handoff:
-
-```sh
-npm run email:prepare-university --prefix server
-```
-
-That preparation command may create the pending domain in this Resend account
-and disable its tracking; it does not publish DNS or send messages.
+The SPU sender setup was canceled on **14 October 2026**. The earlier
+`clinic.spu.ac.za` domain was prepared but remained unverified; university DNS
+was not changed. [RESEND_UNIVERSITY_DNS.md](RESEND_UNIVERSITY_DNS.md) preserves
+that historical handoff. Do not configure its address as the active sender or
+run the university preparation command as a required setup step. The handoff
+can be reconsidered only if that domain is separately approved and verified.
+No replacement provider or verified sender is configured by canceling SPU.
 
 ```sh
 npm run email:check --prefix server
@@ -70,19 +68,23 @@ prints configuration/status categories. It checks the exact sender domain is
 verified and enabled for sending; it never sends an email or prints keys, OTPs,
 recipient addresses or provider payloads. A sending-only key cannot read domains,
 so use the Resend dashboard or a domain-readable key for this administrative check.
-The API can keep a restricted sending key for runtime delivery.
+The API can keep a restricted sending key for runtime delivery. This general
+sender check remains unavailable while the primary sender is empty; it does not
+measure delivery through the separate owner-admin route.
 [Domain API](https://resend.com/docs/api-reference/domains/list-domains),
 [API-key permissions](https://resend.com/docs/api-reference/api-keys/create-api-key).
 
 A successful domain check does not establish inbox delivery. Complete the login
 flow with an authorized account and the actually received code before accepting
-the email channel for live use. No external email was sent during this change.
+the email channel for live use. Read-only checks do not send messages.
 
 Supabase sends account invitations, confirmation and password-recovery emails
 through its Auth configuration. Use the separate guarded configuration runner
 for production templates and Resend SMTP on port 465. It verifies the sender
-before changing SMTP and preserves existing redirects. SPU's subdomain response
-is pending; university recipients can also use a separately owned sender domain.
+before changing SMTP and preserves existing redirects. Custom SMTP is currently
+absent. Supabase's default service sends only to project-team addresses; accepting
+any valid email in the application does not remove that provider restriction.
+Configure the verified replacement sender before general onboarding.
 [Email setup, timing and live acceptance](docs/email-delivery.md).
 
 ## Roles and clinic workflows
@@ -135,14 +137,19 @@ describes the cache, quotas and dedicated endpoint needed for sustained traffic.
 Apply migration017 for the optional profile coordinates. Manual residential
 addresses remain available whenever the map service is unavailable.
 
-Production needs HTTPS origins, full Resend credentials, a verified custom sender,
-configured Supabase Auth mail/redirects, and certificate-verified PostgreSQL TLS.
+Production clinic use needs HTTPS origins, full Resend credentials, a verified
+replacement custom sender, configured Supabase Auth mail/redirects, and
+certificate-verified PostgreSQL TLS. An empty primary sender with a complete
+owner-admin binding permits only the existing administrator's OTP delivery;
+it does not make general onboarding ready.
 `DATABASE_SSL_CA` supplies a custom CA when needed. Ordinary Supabase queries can
 use the transaction pooler on 6543. Vercel uses a durable change log and bounded
 SSE on that connection. Local/persistent `LISTEN` deployments additionally use a
 session connection on 5432 through `DATABASE_EVENTS_URL`.
 
-Docker Compose requires `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. The backend
+Docker Compose requires `RESEND_API_KEY` and either `RESEND_FROM_EMAIL` or the
+complete owner-admin binding. An empty primary sender leaves general mail
+unavailable. The backend
 image includes native migration and read-only email-check runners:
 
 ```sh

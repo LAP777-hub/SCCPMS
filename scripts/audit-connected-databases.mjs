@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { developmentEmailSender, emailSender, validResendKey } from '../server/scripts/check-email.mjs';
+import { emailSender, validResendKey } from '../server/scripts/check-email.mjs';
 const require = createRequire(resolve('server/package.json'));
 require('dotenv').config({ path: resolve('server/.env'), quiet: true });
 const { createClient } = require('@supabase/supabase-js');
@@ -17,7 +17,8 @@ const users = await auth.auth.admin.listUsers({ perPage: 1000 });
 console.log('Auth user count:', users.error ? 'unavailable' : users.data.users.length);
 console.log('RESEND_API_KEY configured:', Boolean(process.env.RESEND_API_KEY?.trim()));
 console.log('Full Resend API key format valid:', validResendKey(process.env.RESEND_API_KEY));
-console.log('Resend test sender:', emailSender(process.env.RESEND_FROM_EMAIL || developmentEmailSender)?.testDomain ?? false);
+console.log('Primary sender configured:', Boolean(process.env.RESEND_FROM_EMAIL?.trim()));
+console.log('Resend test sender:', emailSender(process.env.RESEND_FROM_EMAIL)?.testDomain ?? false);
 console.log('Provider domain readiness: run npm run email:check --prefix server (GET only; no emails sent).');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL_MODE === 'verify-full' ? { rejectUnauthorized: true, ...(process.env.DATABASE_SSL_CA ? { ca: process.env.DATABASE_SSL_CA.replace(/\\n/g, '\n') } : {}) } : undefined, connectionTimeoutMillis: 5000 });
 try {

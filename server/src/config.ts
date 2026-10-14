@@ -18,7 +18,7 @@ const schema = z.object({
   OTP_VALIDITY_SECONDS: z.coerce.number().int().min(120).max(900).default(600),
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(300).default(30),
   RESEND_API_KEY: z.string().trim().default(''),
-  RESEND_FROM_EMAIL: z.string().trim().default('SCCPMS <onboarding@resend.dev>'),
+  RESEND_FROM_EMAIL: z.string().trim().default(''),
   // Optional bootstrap delivery only to the confirmed Resend owner's admin.
   RESEND_ADMIN_OWNER_EMAIL: z.union([z.literal(''), z.string().trim().email().max(254).transform(value => value.toLowerCase())]).default(''),
   RESEND_ADMIN_OWNER_USER_ID: z.union([z.literal(''), z.string().uuid()]).default(''),
@@ -44,8 +44,12 @@ export const configSchema = schema.superRefine((value, context) => {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['FRONTEND_ORIGIN'], message: 'Production requires an HTTPS frontend origin.' });
   }
   const sender = senderEmailAddress(value.RESEND_FROM_EMAIL);
-  if (!sender) {
+  const ownerConfigured = Boolean(value.RESEND_ADMIN_OWNER_EMAIL && value.RESEND_ADMIN_OWNER_USER_ID);
+  if (value.RESEND_FROM_EMAIL && !sender) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['RESEND_FROM_EMAIL'], message: 'Use a valid sender email or Display Name <email@example.com>, without line breaks.' });
+  }
+  if (value.NODE_ENV === 'production' && !value.RESEND_FROM_EMAIL && !ownerConfigured) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['RESEND_FROM_EMAIL'], message: 'Configure a verified sender, or the complete owner-only administrator binding while general email delivery is unavailable.' });
   }
   if (value.NODE_ENV === 'production' && !/^re_[A-Za-z0-9_-]{20,}$/.test(value.RESEND_API_KEY)) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['RESEND_API_KEY'], message: 'Production requires a full Resend API key; a masked exported token cannot send email.' });

@@ -2,7 +2,7 @@
 
 **Report date:** 14 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the 14 October email changes are live on both Git-connected Vercel projects. The latest owner-route implementation workflow passes **95/95 browser tests**, **301 server unit checks with six intentional database skips**, **six real database cases without skips**, and security checks. Real delivery through the confirmed owner's administrator sender was accepted and reported delivered; the live OTP/login round trip still requires the user's request and code entry. All valid recipient emails are accepted; general sender DNS verification, custom SMTP and clinical acceptance remain incomplete. SPU's subdomain response is pending. Earlier failures and corrections remain recorded below.
+**Status:** all valid recipient emails are accepted, and the SPU sender plan was canceled on 14 October. No replacement sending domain or SMTP account is available yet. The preceding owner-route release is live on both Git-connected Vercel projects, with **95/95 browser tests**, **301 server unit passes with six intentional database skips**, **six real database passes**, and security checks. Real administrator delivery was accepted and reported delivered; a live OTP/login round trip still requires the user's request and code entry. The cancellation update passes its local checks in section 11g; its publication results are recorded there when complete. General mail delivery and clinical acceptance remain incomplete. Earlier failures and corrections remain recorded below.
 
 This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
@@ -54,7 +54,7 @@ These are completed results available when this report was assembled. Counts fro
 | Deployed runtime connectivity | **Passed: frontend/API/database health 200** | Seven live HTTP checks pass; campus-network failures remain historical/local evidence in sections 11b/11d |
 | Hosted development redirect routing | Passed | Saved/read back 5173; default/signup/invite/recovery HTTP 303 probes resolve to the development frontend |
 | Resend key/domain API | Passed key acceptance | Authenticated read-only domain lookup succeeded; this is not delivery acceptance |
-| University sending domain | **Blocked pending DNS verification** | `clinic.spu.ac.za` prepared; actual university DNS publication/verification incomplete |
+| Former university sending domain | **Canceled; historical setup only** | `clinic.spu.ac.za` was prepared but unverified; a replacement sender is now required for general delivery |
 | Actual university OTP and Auth mail round trips | **Not yet verified** | No real received-message acceptance recorded |
 | Focused browser suspension run | **5/5 passed on rerun** | Initial 3 pass/2 fail retained in chronology; successful rerun 8.8s |
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
@@ -981,6 +981,40 @@ The delivered diagnostic establishes that the owner's sender route can reach tha
 
 Owner implementation commit [`a53f3df`](https://github.com/LAP777-hub/SCCPMS/commit/a53f3dff4c0525437365579d8b071fadf8da36ed) is published and both Vercel projects are READY for that code. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38636184567) passes all three jobs: **301 server passes / six explicit unit database skips**, separate real PostgreSQL **6/6 without skips**, browser **95/95**, and security/publication checks. The final index scan covers **468 files with zero findings**. Deployed HTTP checks pass **7/7**, including database health200, protected GET/POST401 and production CORS204. Read-only owner OTP state showed two failed recent requests, no pending draft or valid code, and room below the ten/hour cap; no counters, sessions or challenge rows were reset. The user was instructed to request a fresh code through the live system.
 
+## 11g. Cancel SPU sender setup and preserve all-email acceptance
+
+On 14 October 2026 the user canceled the SPU email domain and confirmed that no
+replacement sending domain or SMTP account is available yet. Registration,
+admin-created patient accounts, doctor/receptionist invitations and trusted
+login validation already accept all valid recipient domains. Gmail, Outlook,
+Yahoo and custom-domain cases remain covered; required identities and role
+authorization are retained. The unused university-domain setting was also
+removed from Docker Compose.
+
+The primary Resend sender now defaults to empty, with no automatic test-domain
+fallback. Production permits that state only with the complete valid binding
+for the existing Resend-owner administrator; malformed bindings, global test
+senders, missing full API keys and insecure database settings still fail
+validation. Other accounts receive `OTP_EMAIL_UNAVAILABLE` before a challenge
+reservation or provider request. Existing accepted codes remain usable, and a
+missing sender does not spend hourly code allowances. The normal authenticated
+owner route still stores its exact sender and commits provider acknowledgements.
+Docker/environment checks now describe this limited state consistently.
+
+| Completed cancellation check | Result and boundary |
+| --- | --- |
+| Focused registration, trusted Auth, config, owner and resend checks | **111/111 passed**, no skips, Node22, 20.929s; provider/database fixtures isolated |
+| Full server suite before the new administrative-readiness case | **311 total: 305 passed, six intentional database skips, zero failed**, Node22, 74.651s |
+| Missing-sender administrative readiness | **1/1 passed**, no skips, Node22, 0.606s; missing/blank senders in both modes cannot report ready or call the provider |
+| Server TypeScript | Passed |
+
+The previous university DNS handoff is retained as historical evidence and is
+no longer a required setup step. Accepting an email address does not establish
+delivery: other-role OTPs and general confirmation/invitation/recovery mail
+remain unavailable until a replacement sender and Supabase custom SMTP are
+configured. No new messages, users or account/clinical data were created by
+this change. Publication and production checks are recorded below when complete.
+
 ## 12. Supporting documents
 
 - [Operations](../OPERATIONS.md)
@@ -989,8 +1023,8 @@ Owner implementation commit [`a53f3df`](https://github.com/LAP777-hub/SCCPMS/com
 - [Auth email callbacks and hosted redirects](auth-email-links.md)
 - [Registration catalogue and NAS correction](academic-catalogue.md)
 - [Address provider configuration and limitations](residential-address-search.md)
-- [University Resend DNS handoff](../RESEND_UNIVERSITY_DNS.md)
+- [Historical university Resend DNS handoff](../RESEND_UNIVERSITY_DNS.md)
 - [Login session and port diagnostics](session-connectivity.md)
 - [GitHub/Vercel deployment](vercel-deployment.md)
 
-This report is maintained from recorded command results, source inventory and the retained local artifacts. Hosting and cloud database connectivity pass. Pending release gates include external university email and institutional operational acceptance; local university-network instability remains separately documented.
+This report is maintained from recorded command results, source inventory and the retained local artifacts. Hosting and cloud database connectivity pass. Pending release gates include a verified replacement sender, custom SMTP and institutional operational acceptance; local university-network instability remains separately documented.

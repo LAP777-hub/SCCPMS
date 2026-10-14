@@ -21,7 +21,7 @@ export function emailSender(value) {
 
 // GET requests only. No email, DNS mutation, or provider key creation is performed.
 export async function checkEmailConfiguration(settings, fetcher = fetch) {
-  const sender = emailSender(settings.fromEmail || developmentEmailSender);
+  const sender = emailSender(settings.fromEmail);
   const summary = {
     ok: false,
     keyConfigured: Boolean(settings.apiKey?.trim()),
@@ -97,7 +97,7 @@ async function main() {
   console.log(`Resend API key configured: ${summary.keyConfigured ? 'yes' : 'no'}`);
   console.log(`Full API key format: ${summary.keyFormatValid ? 'valid' : 'missing or invalid'}`);
   console.log(`Sender format: ${summary.senderValid ? 'valid' : 'invalid'}`);
-  console.log(`Sender kind: ${summary.testSender ? 'development test domain' : 'custom domain'}`);
+  console.log(`Sender kind: ${!summary.senderValid ? 'not configured or invalid' : summary.testSender ? 'development test domain' : 'custom domain'}`);
   console.log(`Domain access: ${summary.domainAccess}${summary.httpStatus ? ` (HTTP ${summary.httpStatus})` : ''}`);
   console.log(`Sender domain verified: ${summary.senderDomainVerified ? 'yes' : 'no'}`);
   console.log(`Sender sending enabled: ${summary.senderSendingEnabled ? 'yes' : 'no'}`);
@@ -107,7 +107,7 @@ async function main() {
   if (summary.domainAccess === 'permission_required')
     console.error('A sending-only key cannot read domains. Check the verified sender in the Resend dashboard or use a domain-readable key for this check.');
   if (summary.testSender)
-    console.log('The development test sender is limited to the Resend account owner. Production and university recipients need a verified custom sending domain.');
+    console.log('The development test sender is limited to the Resend account owner. General delivery needs a verified custom sending domain.');
   console.log('No emails sent. Domain readiness does not prove inbox delivery.');
   if (!summary.ok) process.exitCode = 1;
 }

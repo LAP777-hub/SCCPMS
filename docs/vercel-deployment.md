@@ -9,8 +9,9 @@ API/database health 200, production CORS and protected GET/POST rejection. GitHu
 CI passes 95/95 browser cases, 301 server checks, six real database cases and
 security checks. Supabase Site URL and
 signup/invite/recovery redirects now target the production frontend; previous
-local callback URLs remain allowed. University email delivery still requires
-the sender-domain DNS and SMTP/inbox acceptance described below.
+local callback URLs remain allowed. All valid recipient emails are accepted.
+The SPU sender setup was canceled on 14 October; general email delivery still
+requires a verified replacement sender and SMTP/inbox acceptance described below.
 
 ## Repository and project settings
 
@@ -66,11 +67,18 @@ Set these variables on the **API** project's Production environment:
 | `OTP_VALIDITY_SECONDS` | `600`: code validity from provider acceptance; permitted range 120–900 |
 | `OTP_RESEND_COOLDOWN_SECONDS` | `30`: minimum interval after accepted sending; permitted range 30–300 |
 | `RESEND_API_KEY` | The full Resend sending key |
-| `RESEND_FROM_EMAIL` | A sender on a custom domain verified and enabled for sending in Resend |
+| `RESEND_FROM_EMAIL` | Intentionally unset or empty until a replacement custom-domain sender is verified and enabled for sending; empty production setting requires the complete owner-admin binding below |
 | `RESEND_ADMIN_OWNER_EMAIL` | Optional temporary Resend owner email, bound to the existing confirmed administrator; configure together with its Auth ID |
 | `RESEND_ADMIN_OWNER_USER_ID` | Optional exact Auth UUID for that administrator; owner-only OTP route never applies to other accounts |
 
 Vercel supplies `VERCEL=1` automatically. `PORT` is for the local server and does not select the hosted API URL. Store backend secrets in the API project's environment settings, not source files or frontend variables. Optional Photon address-search settings are documented in `server/.env.example`.
+
+Deploy the API source that permits a blank primary sender with a complete valid
+owner binding before removing its former `RESEND_FROM_EMAIL` Vercel variable.
+Redeploy after the environment change. Keep both owner settings private and
+configured together. This permits only the configured confirmed administrator's
+real OTP delivery; all other accounts fail safely until a replacement sender is
+verified. Never set `onboarding@resend.dev` as a global production sender.
 
 Copy **Transaction pooler** from Supabase's Connect dialog. Its form is:
 
@@ -84,7 +92,7 @@ Keep certificate verification enabled. The API bundles the Supabase root CA, wit
 
 On Vercel, cross-instance updates use the durable database change log and bounded SSE: streams last up to 50 seconds, with authentication rechecked every 15 seconds, then reconnect. Persistent PostgreSQL `LISTEN` is disabled in that runtime. **Only port 6543 is required for Vercel clinic queries.** `DATABASE_EVENTS_URL` on port 5432 belongs to local or other persistent hosting that uses `LISTEN`; omit it from Vercel. Dashboard polling remains available when the event stream cannot connect.
 
-Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates, `021_shared_request_limits.sql` for shared request/address-provider budgets, and `022_otp_delivery_timing.sql` for pending/accepted OTP timing and safe resends.
+Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates, `021_shared_request_limits.sql` for shared request/address-provider budgets, `022_otp_delivery_timing.sql` for pending/accepted OTP timing and safe resends, and `023_otp_sender_binding.sql` for retries using the saved sender.
 
 ```sh
 npm ci --prefix server
@@ -111,11 +119,11 @@ Replace the origin consistently if using a custom domain. Hosted settings are se
 
 Supabase sends confirmation, invitation and password-reset mail. The API sends the additional login OTP through Resend's email API. Configure both channels. For Supabase custom SMTP with Resend, use host `smtp.resend.com`, port `465` with TLS, username `resend`, the full API key as the SMTP password, and a verified sender address/name. [Resend's Supabase SMTP setup](https://resend.com/docs/send-with-supabase-smtp).
 
-**University email delivery is still blocked by sender DNS verification.** `clinic.spu.ac.za` was prepared in Resend but remains unverified. University IT must approve and publish the records in [RESEND_UNIVERSITY_DNS.md](../RESEND_UNIVERSITY_DNS.md). After verification, an approved example sender is `SCCPMS <login@clinic.spu.ac.za>`. The `onboarding@resend.dev` sender is limited to the Resend account owner and is refused by production configuration. Importing GitHub code does not complete DNS or SMTP setup.
+**The SPU sender setup was canceled on 14 October 2026.** Leave the primary sender unset or empty until a replacement domain you own is verified. `clinic.spu.ac.za` was prepared but remained unverified; [its DNS handoff](../RESEND_UNIVERSITY_DNS.md) is now historical and optional, not an active deployment requirement. The existing administrator retains a separate `SCCPMS <onboarding@resend.dev>` OTP route with exact trusted admin ID/email/recipient checks. This sender is never enabled for other users. Importing GitHub code does not complete general sender verification or SMTP setup. [Resend's owner-only restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
 
 Use `npm run email:check --prefix server -- --production` from a securely configured operator environment for a read-only domain check. Real inbox acceptance still requires an authorized account receiving its actual confirmation/invitation and OTP; mocked tests and a successful domain check do not establish delivery.
 
-SPU has been asked to help with a subdomain. A separately owned verified sender also works with `@spu.ac.za` recipients. [Production email setup](email-delivery.md) describes the guarded template/SMTP runner, new two-hour Auth links, and ten-minute login OTPs. Deploy the frontend's confirmation landing page before applying the new hosted templates. SMTP activation remains gated on verified DNS.
+All valid recipient domains are accepted by the application; student email does not have to match a student number. Supabase custom SMTP remains absent, so its default service still limits Auth mail to project-team addresses. Configure the replacement verified sender and custom SMTP before general signup/invitation/recovery delivery. [Supabase SMTP restrictions](https://supabase.com/docs/guides/auth/auth-smtp). [Production email setup](email-delivery.md) describes the guarded template/SMTP runner, two-hour Auth links and ten-minute login OTPs. Deploy the frontend's confirmation landing page before applying the new hosted templates. SMTP activation remains gated on verified DNS.
 
 ## Import, connect and validate
 
