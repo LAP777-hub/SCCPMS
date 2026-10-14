@@ -2,7 +2,7 @@
 
 The active system is the React application in the repository root and the Express API in `server/`. Import the same GitHub repository into two Vercel projects. Vercel supports a separate project for each application directory. [Vercel monorepo imports](https://vercel.com/docs/monorepos#add-a-monorepo-through-the-vercel-dashboard).
 
-Both Vercel projects are linked to [LAP777-hub/SCCPMS](https://github.com/LAP777-hub/SCCPMS), production branch `main`: **sccpms** at `https://sccpms.vercel.app`, and **sccpms-api** at `https://sccpms-api.vercel.app`. Their production settings and separate environment variables are configured in Vercel. The frontend has three public variables; the API has sixteen private/runtime variables, including OTP validity/cooldown. Environment values remain outside Git. Deployment checks and failures are recorded in [the testing report](TESTING_REPORT.md).
+Both Vercel projects are linked to [LAP777-hub/SCCPMS](https://github.com/LAP777-hub/SCCPMS), production branch `main`: **sccpms** at `https://sccpms.vercel.app`, and **sccpms-api** at `https://sccpms-api.vercel.app`. Their production settings and separate environment variables are configured in Vercel. The frontend has three public variables; the API has eighteen private/runtime variables, including OTP validity/cooldown and the temporary owner-admin binding. Environment values remain outside Git. Deployment checks and failures are recorded in [the testing report](TESTING_REPORT.md).
 
 Both production deployments are READY. Live checks verify frontend assets/routing,
 API/database health 200, production CORS and protected GET/POST rejection. GitHub
@@ -67,6 +67,8 @@ Set these variables on the **API** project's Production environment:
 | `OTP_RESEND_COOLDOWN_SECONDS` | `30`: minimum interval after accepted sending; permitted range 30–300 |
 | `RESEND_API_KEY` | The full Resend sending key |
 | `RESEND_FROM_EMAIL` | A sender on a custom domain verified and enabled for sending in Resend |
+| `RESEND_ADMIN_OWNER_EMAIL` | Optional temporary Resend owner email, bound to the existing confirmed administrator; configure together with its Auth ID |
+| `RESEND_ADMIN_OWNER_USER_ID` | Optional exact Auth UUID for that administrator; owner-only OTP route never applies to other accounts |
 
 Vercel supplies `VERCEL=1` automatically. `PORT` is for the local server and does not select the hosted API URL. Store backend secrets in the API project's environment settings, not source files or frontend variables. Optional Photon address-search settings are documented in `server/.env.example`.
 

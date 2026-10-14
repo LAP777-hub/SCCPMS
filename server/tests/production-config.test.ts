@@ -6,6 +6,16 @@ const production = { ...config, NODE_ENV: 'production', FRONTEND_ORIGIN: 'https:
 test('production accepts Resend credentials, a custom-domain sender, exact HTTPS origin and certificate-verified database', () => {
   assert.equal(configSchema.safeParse(production).success, true);
 });
+
+test('owner-only delivery requires a complete valid account binding and cannot make the global test sender a production sender', () => {
+  const owner = { RESEND_ADMIN_OWNER_EMAIL: 'admin.owner.fixture@gmail.com', RESEND_ADMIN_OWNER_USER_ID: '00000000-0000-4000-8000-000000000081' };
+  assert.equal(configSchema.safeParse({ ...production, ...owner }).success, true);
+  for (const changes of [
+    { ...owner, RESEND_ADMIN_OWNER_EMAIL: '' }, { ...owner, RESEND_ADMIN_OWNER_USER_ID: '' },
+    { ...owner, RESEND_ADMIN_OWNER_EMAIL: 'invalid-address' }, { ...owner, RESEND_ADMIN_OWNER_USER_ID: 'not-a-uuid' },
+    { ...owner, RESEND_FROM_EMAIL: 'SCCPMS <onboarding@resend.dev>' },
+  ]) assert.equal(configSchema.safeParse({ ...production, ...changes }).success, false);
+});
 for (const [name, changes] of [
   ['missing Resend API key', { RESEND_API_KEY: '' }],
   ['invalid Resend API key prefix', { RESEND_API_KEY: 'test_fixture_only' }],

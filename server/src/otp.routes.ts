@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import { Router, type Request, type Response } from 'express';
 import { pool } from './db.js';
 import { requireAuth } from './auth.js';
-import { sendOtpEmail, EmailDeliveryError } from './email.js';
+import { sendOtpEmail, selectOtpEmailSender, EmailDeliveryError } from './email.js';
 import { otpCodeHash, otpEmailHash } from './otp-security.js';
 import { maskEmailAddress } from './email-address.js';
 import { logger } from './logger.js';
@@ -60,7 +60,7 @@ router.post('/send', async (req, res) => {
   const identity = { userId, sessionId, emailHash };
   let lease: OtpLease;
   try {
-    lease = await reserveOtpChallenge(pool, identity);
+    lease = await reserveOtpChallenge(pool, identity, selectOtpEmailSender(req.auth!));
   } catch (error) {
     if (error instanceof OtpChallengeError) {
       const message = error.code === 'OTP_HOURLY_LIMIT'
@@ -91,7 +91,7 @@ router.post('/send', async (req, res) => {
   let acknowledgedAt = lease.acceptedAt;
   try {
     if (!messageId || !acknowledgedAt) {
-      const delivery = await sendOtpEmail(email, challengeCode(identity, lease.id), lease.id, config, lease.validitySeconds);
+      const delivery = await sendOtpEmail(email, challengeCode(identity, lease.id), lease.id, config, lease.validitySeconds, {}, { userId, role: req.auth!.role, email, senderFrom: lease.senderFrom });
       messageId = delivery.messageId;
       acknowledgedAt = new Date();
     }

@@ -110,6 +110,8 @@ Supabase sends confirmation, invitation and password-reset emails. Resend sends 
 
 The university sender `clinic.spu.ac.za` remains pending DNS verification. SPU has been asked to help with a subdomain; IT can publish [the prepared DNS records](RESEND_UNIVERSITY_DNS.md) without granting DNS access. A separately owned verified sender domain also works with university recipients. See [production email setup](docs/email-delivery.md) for the guarded SMTP/template runner, ten-minute OTPs and live acceptance requirements.
 
+The existing administrator has a temporary real-OTP route through Resend's owner-only sender, bound to the confirmed owner's exact account ID, role and email. Other accounts continue using the main sender. This restores administrator mail access while the verified clinic sender is pending; it does not configure general signup/invitation SMTP.
+
 Read-only sender checks are available from a securely configured environment:
 
 ```sh

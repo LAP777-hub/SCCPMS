@@ -2,7 +2,29 @@ import { config } from './config.js';
 import { normalizeEmailAddress, productionEmailSender, senderEmailAddress } from './email-address.js';
 
 export type EmailSettings = Pick<typeof config, 'NODE_ENV' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL'>
-  & Partial<Pick<typeof config, 'OTP_VALIDITY_SECONDS'>>;
+  & Partial<Pick<typeof config, 'OTP_VALIDITY_SECONDS' | 'RESEND_ADMIN_OWNER_EMAIL' | 'RESEND_ADMIN_OWNER_USER_ID'>>;
+export type OtpEmailAuthorization = {
+  userId: string;
+  role: string;
+  email: string;
+  senderFrom?: string | null;
+};
+export const OWNER_OTP_SENDER = 'SCCPMS <onboarding@resend.dev>';
+
+function authorizedOwner(context: Omit<OtpEmailAuthorization, 'senderFrom'> | undefined, settings: EmailSettings): boolean {
+  const ownerEmail = normalizeEmailAddress(settings.RESEND_ADMIN_OWNER_EMAIL);
+  const ownerId = settings.RESEND_ADMIN_OWNER_USER_ID;
+  return Boolean(context && ownerEmail && typeof ownerId === 'string'
+    && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(ownerId)
+    && context.role === 'admin' && context.userId === ownerId
+    && normalizeEmailAddress(context.email) === ownerEmail);
+}
+
+// The server supplies this identity after JWT/profile validation. An empty or
+// partial owner configuration cannot enable the provider's owner-only sender.
+export function selectOtpEmailSender(context: Omit<OtpEmailAuthorization, 'senderFrom'>, settings: EmailSettings = config): string {
+  return authorizedOwner(context, settings) ? OWNER_OTP_SENDER : settings.RESEND_FROM_EMAIL;
+}
 type EmailFailureReason = 'configuration' | 'invalid_email' | 'timeout' | 'network' | 'authentication'
   | 'provider_rejected' | 'invalid_response' | 'sender_unverified' | 'rate_limited' | 'quota_exceeded';
 export class EmailDeliveryError extends Error {
@@ -46,16 +68,20 @@ function rejectedEmail(response: Response, payload: unknown): EmailDeliveryError
 }
 
 export async function sendOtpEmail(email: string, code: string, challengeId: string, settings: EmailSettings = config,
-  validitySeconds = settings.OTP_VALIDITY_SECONDS ?? config.OTP_VALIDITY_SECONDS, transport: Partial<EmailTransport> = {}) {
+  validitySeconds = settings.OTP_VALIDITY_SECONDS ?? config.OTP_VALIDITY_SECONDS, transport: Partial<EmailTransport> = {},
+  authorization?: OtpEmailAuthorization) {
   const destination = normalizeEmailAddress(email);
   if (!destination) throw new EmailDeliveryError('invalid_email');
-  const sender = senderEmailAddress(settings.RESEND_FROM_EMAIL);
+  const selectedFrom = authorization?.senderFrom ?? (authorization ? selectOtpEmailSender(authorization, settings) : settings.RESEND_FROM_EMAIL);
+  const sender = senderEmailAddress(selectedFrom);
   if (!/^re_[A-Za-z0-9_-]{20,}$/.test(settings.RESEND_API_KEY) || !sender || !/^\d{6}$/.test(code)
     || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(challengeId)
     || !Number.isInteger(validitySeconds) || validitySeconds < 120 || validitySeconds > 900) {
     throw new EmailDeliveryError('configuration');
   }
-  if (settings.NODE_ENV === 'production' && !productionEmailSender(settings.RESEND_FROM_EMAIL)) throw new EmailDeliveryError('configuration');
+  const ownerSenderAuthorized = selectedFrom === OWNER_OTP_SENDER && authorizedOwner(authorization, settings)
+    && destination === normalizeEmailAddress(settings.RESEND_ADMIN_OWNER_EMAIL);
+  if (settings.NODE_ENV === 'production' && !productionEmailSender(selectedFrom) && !ownerSenderAuthorized) throw new EmailDeliveryError('configuration');
 
   const fetcher = transport.fetcher ?? fetch;
   const now = transport.now ?? (() => performance.now());
@@ -67,7 +93,7 @@ export async function sendOtpEmail(email: string, code: string, challengeId: str
   // Reuse every field and the idempotency key on retry. Never queue a new code
   // just because the first response was lost after the provider accepted it.
   const body = JSON.stringify({
-        from: settings.RESEND_FROM_EMAIL,
+        from: selectedFrom,
         to: [destination],
         subject: 'Your SCCPMS sign-in verification code',
         text: `Your SCCPMS verification code is ${code}. It expires in ${duration} after the email service accepts it. Do not share this code. If you did not request it, ignore this email.`,

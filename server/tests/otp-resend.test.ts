@@ -11,10 +11,10 @@ const sessionId = '00000000-0000-4000-8000-000000000002';
 const messageId = '00000000-0000-4000-8000-000000000003';
 const email = 'patient@spu.ac.za';
 const emailHash = otpEmailHash(userId, email)!;
-let originalSettings: Pick<typeof config, 'NODE_ENV' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL' | 'OTP_VALIDITY_SECONDS' | 'OTP_RESEND_COOLDOWN_SECONDS'>;
+let originalSettings: Pick<typeof config, 'NODE_ENV' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL' | 'OTP_VALIDITY_SECONDS' | 'OTP_RESEND_COOLDOWN_SECONDS' | 'RESEND_ADMIN_OWNER_EMAIL' | 'RESEND_ADMIN_OWNER_USER_ID'>;
 beforeEach(() => {
-  originalSettings = { NODE_ENV: config.NODE_ENV, RESEND_API_KEY: config.RESEND_API_KEY, RESEND_FROM_EMAIL: config.RESEND_FROM_EMAIL, OTP_VALIDITY_SECONDS: config.OTP_VALIDITY_SECONDS, OTP_RESEND_COOLDOWN_SECONDS: config.OTP_RESEND_COOLDOWN_SECONDS };
-  Object.assign(config, { NODE_ENV: 'production', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>', OTP_VALIDITY_SECONDS: 600, OTP_RESEND_COOLDOWN_SECONDS: 30 });
+  originalSettings = { NODE_ENV: config.NODE_ENV, RESEND_API_KEY: config.RESEND_API_KEY, RESEND_FROM_EMAIL: config.RESEND_FROM_EMAIL, OTP_VALIDITY_SECONDS: config.OTP_VALIDITY_SECONDS, OTP_RESEND_COOLDOWN_SECONDS: config.OTP_RESEND_COOLDOWN_SECONDS, RESEND_ADMIN_OWNER_EMAIL: config.RESEND_ADMIN_OWNER_EMAIL, RESEND_ADMIN_OWNER_USER_ID: config.RESEND_ADMIN_OWNER_USER_ID };
+  Object.assign(config, { NODE_ENV: 'production', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>', OTP_VALIDITY_SECONDS: 600, OTP_RESEND_COOLDOWN_SECONDS: 30, RESEND_ADMIN_OWNER_EMAIL: '', RESEND_ADMIN_OWNER_USER_ID: '' });
 });
 afterEach(() => { Object.assign(config, originalSettings); mock.restoreAll(); });
 
@@ -31,7 +31,7 @@ const request = () => ({ auth: { userId, sessionId, email }, body: {} }) as unkn
 const send = otp.stack.find((layer: any) => layer.route?.path === '/send').route.stack.at(-1).handle;
 
 function fixture(failAuditOnce = false) {
-  type Draft = { id: string; delivery_state: string; consumed_at: Date | null; accepted_at: Date | null; expires_at: Date; validity_seconds: number; provider_message_id: string | null; code_hash: string; too_old: boolean };
+  type Draft = { id: string; delivery_state: string; consumed_at: Date | null; accepted_at: Date | null; expires_at: Date; validity_seconds: number; provider_message_id: string | null; code_hash: string; too_old: boolean; sender_from: string };
   let draft: Draft | null = null;
   let audits = 0, oldConsumed = false;
   const hooks = { afterCommit: undefined as (() => void) | undefined };
@@ -43,10 +43,12 @@ function fixture(failAuditOnce = false) {
       if (sql.includes('SELECT policy.*')) return { rows: [{ hourly_count: draft ? 2 : 1, retry_after_seconds: 0,
         id: draft?.delivery_state === 'pending' && !draft.consumed_at ? draft.id : null,
         validity_seconds: draft?.validity_seconds, provider_message_id: draft?.provider_message_id, accepted_at: draft?.accepted_at,
+        sender_from: draft?.sender_from,
       }], rowCount: 1 };
       if (sql.includes('INSERT INTO otp_challenges')) draft = {
         id: String(values?.[0]), code_hash: String(values?.[3]), delivery_state: 'pending', consumed_at: null,
         validity_seconds: Number(values?.[5]), accepted_at: null, provider_message_id: null, expires_at: new Date(), too_old: false,
+        sender_from: String(values?.[6]),
       };
       if (sql.includes('SELECT delivery_state')) return { rows: draft ? [draft] : [], rowCount: draft ? 1 : 0 };
       if (sql.includes('auth.otp_requested')) {
@@ -80,6 +82,28 @@ function fixture(failAuditOnce = false) {
   });
   return { statements, originalExpiry, hooks, get draft() { return draft; }, get audits() { return audits; }, get oldConsumed() { return oldConsumed; } };
 }
+
+test('the production owner administrator commits its bound sender and provider acknowledgement using isolated fixtures', async () => {
+  const ownerEmail = 'admin.owner.fixture@gmail.com';
+  Object.assign(config, { RESEND_ADMIN_OWNER_EMAIL: ownerEmail, RESEND_ADMIN_OWNER_USER_ID: userId });
+  const database = fixture();
+  let sent: { from: string; to: string[]; text: string } | undefined;
+  mock.method(globalThis, 'fetch', async (_input: unknown, init?: RequestInit) => {
+    sent = JSON.parse(String(init?.body));
+    return Response.json({ id: messageId });
+  });
+  const { result, res } = response();
+  const owner = { auth: { userId, sessionId, email: ownerEmail, role: 'admin' }, body: {} } as unknown as Request;
+  await send(owner, res);
+  assert.equal(result.status, 202);
+  assert.equal(sent?.from, 'SCCPMS <onboarding@resend.dev>');
+  assert.deepEqual(sent?.to, [ownerEmail]);
+  assert.equal(database.draft?.sender_from, sent?.from);
+  assert.equal(database.draft?.delivery_state, 'accepted');
+  assert.equal(database.audits, 1);
+  assert.ok(result.body.expiresInSeconds >= 599 && result.body.expiresInSeconds <= 600);
+  assert.equal(Object.hasOwn(result.body, 'code'), false);
+});
 
 test('a rejected sender preserves the old accepted code and offers a short, safe retry', async () => {
   const database = fixture();

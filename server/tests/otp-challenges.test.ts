@@ -63,6 +63,7 @@ test('new reservations preserve accepted codes and persist the validity for idem
   const reserved = await reserveOtpChallenge(database, identity);
   assert.equal(reserved.validitySeconds, config.OTP_VALIDITY_SECONDS);
   assert.equal(reserved.providerMessageId, null);
+  assert.equal(reserved.senderFrom, config.RESEND_FROM_EMAIL);
   const insert = statements.find(item => item.sql.includes('INSERT INTO otp_challenges'))!;
   assert.equal(insert.values?.[0], reserved.id);
   assert.equal(insert.values?.[4], identity.emailHash);
@@ -80,12 +81,40 @@ test('pending replay preserves its identifier, acknowledgement and payload durat
     validity_seconds: 900, provider_message_id: messageId, accepted_at: acknowledgedAt,
   } });
   const result = await reserveOtpChallenge(database, identity);
-  assert.deepEqual(result, { id: challengeId, validitySeconds: 900, providerMessageId: messageId, acceptedAt: acknowledgedAt, newlyCreated: false });
+  assert.deepEqual(result, { id: challengeId, validitySeconds: 900, providerMessageId: messageId, acceptedAt: acknowledgedAt, newlyCreated: false, senderFrom: config.RESEND_FROM_EMAIL });
   assert.ok(!statements.some(item => item.sql.includes('INSERT INTO otp_challenges')));
   const acquire = statements.find(item => item.sql.includes('SET delivery_attempt_at'))!;
   assert.match(acquire.sql, /interval '30 seconds'/);
   assert.match(acquire.sql, /consumed_at IS NULL/);
-  assert.deepEqual(acquire.values, [challengeId, userId, sessionId, identity.emailHash]);
+  assert.deepEqual(acquire.values, [challengeId, userId, sessionId, identity.emailHash, config.RESEND_FROM_EMAIL]);
+});
+
+test('a new delivery reservation persists its selected sender with the provider-idempotent challenge', async () => {
+  const { database, statements } = databaseFixture();
+  const sender = 'SCCPMS <onboarding@resend.dev>';
+  const reserved = await reserveOtpChallenge(database, identity, sender);
+  assert.equal(reserved.senderFrom, sender);
+  const insert = statements.find(item => item.sql.includes('INSERT INTO otp_challenges'))!;
+  assert.equal(insert.values?.[6], sender);
+  assert.match(insert.sql, /sender_from/);
+});
+
+test('an uncertain retry preserves the original sender after a deployment changes its sender selection', async () => {
+  const sender = 'SCCPMS <login@original-sender-fixture.co.za>';
+  const { database, statements } = databaseFixture({ policy: {
+    hourly_count: 1, retry_after_seconds: 0, id: challengeId, validity_seconds: 600,
+    sender_from: sender, provider_message_id: null, accepted_at: null,
+  } });
+  const reserved = await reserveOtpChallenge(database, identity, 'SCCPMS <onboarding@resend.dev>');
+  assert.equal(reserved.senderFrom, sender);
+  assert.equal(reserved.id, challengeId);
+  assert.equal(statements.find(item => item.sql.includes('SET delivery_attempt_at'))!.values?.[4], sender);
+});
+
+test('a legacy uncertain request retains the main sender rather than changing its idempotent payload to the owner sender', async () => {
+  const { database } = databaseFixture({ policy: { hourly_count: 1, retry_after_seconds: 0, id: challengeId, validity_seconds: 600, sender_from: null } });
+  const reserved = await reserveOtpChallenge(database, identity, 'SCCPMS <onboarding@resend.dev>');
+  assert.equal(reserved.senderFrom, config.RESEND_FROM_EMAIL);
 });
 
 for (const [name, policy, expected] of [

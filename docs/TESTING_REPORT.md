@@ -960,6 +960,25 @@ Hosted link settings were saved: Site URL remains `https://sccpms.vercel.app`, o
 
 Final implementation commit [`e5a6d82`](https://github.com/LAP777-hub/SCCPMS/commit/e5a6d82e8ac0845d22e15825d7c2e5720db65190) is published, and both connected Vercel production deployments are READY. Its [full cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38618624563) passes all three jobs: browser **95/95** in 1.4 minutes, server unit **282 total / 276 passed / six intentional database skips / zero failures**, isolated PostgreSQL **6/6 with no skips/failures**, and publication/security checks. Runtime application code is unchanged by the final documentation update. Actual university/personal-inbox delivery remains blocked by the external sender/SMTP requirements above.
 
+## 11f. Restore the Resend owner's administrator OTP
+
+The new screenshot again showed `OTP_EMAIL_UNAVAILABLE`. Read-only inspection confirmed that the main `clinic.spu.ac.za` sender remained `not_started`, custom SMTP was absent, and production Site URL/two-hour Auth link settings were correct. The user explicitly confirmed that the existing administrator's email is the Resend account email. Official provider documentation permits its default sender only to that owner; this cannot serve other users.
+
+The API now has a narrowly bound temporary owner route. Production mail from `SCCPMS <onboarding@resend.dev>` is permitted only for the configured confirmed active administrator with an exact trusted Auth ID, `admin` role, and matching authenticated email/recipient. Account lookup confirmed one eligible existing administrator and its profile/status; no role, password or account was created or changed. Two private production settings enable that binding. All other users retain the main sender; the global production sender restrictions, real OTP verification, single-use HMAC hashes, session/email binding, attempt limits and cooldowns remain in force.
+
+Additive migration023 stores the exact sender with a challenge. Pending retries preserve it alongside their original code, expiry payload and provider idempotency key. Legacy uncertain requests retain the main sender; cached acknowledgements finalize without another send. The production migration was applied under the migration advisory lock; its version, column and validation constraint were verified without editing account/clinical rows.
+
+| Completed owner-route check | Result and boundary |
+| --- | --- |
+| Focused owner-sender and resilience cases | **30/30 passed**, zero skips; 20 new sender-policy cases plus ten earlier transport cases, Node22, 1.98s, mocked providers |
+| Full server suite | **307 total: 301 passed, six intentional database skips, zero failed**, Node22, 88.101s; includes route acknowledgement, identity policy, sender persistence and existing workflows |
+| Updated real OTP PostgreSQL case | **1/1 passed**, no skips, 32.2s runner; migrations022/023 applied twice, sender persistence/replay, expiry preservation, failure/rollback recovery and cleanup |
+| Server TypeScript | Passed |
+| Production binding | Both values configured as Sensitive on the API project; actual account ID and values kept out of Git/output |
+| Actual Resend delivery check | HTTP200 accepted in **4338ms**, then provider event `delivered`; one email to the confirmed owner, containing **no login code**, no OTP/account rows edited |
+
+The delivered diagnostic establishes that the owner's sender route can reach that mailbox. It is not a completed live OTP/login round trip; a usable code is generated only when the owner requests it through the normal authenticated live sign-in flow. General signup/invitation/other-role mail remains blocked until an owned sender domain is verified and Supabase custom SMTP is configured. [Owner-route operation and removal](email-delivery.md).
+
 ## 12. Supporting documents
 
 - [Operations](../OPERATIONS.md)

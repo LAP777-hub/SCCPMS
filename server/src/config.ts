@@ -19,6 +19,9 @@ const schema = z.object({
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(300).default(30),
   RESEND_API_KEY: z.string().trim().default(''),
   RESEND_FROM_EMAIL: z.string().trim().default('SCCPMS <onboarding@resend.dev>'),
+  // Optional bootstrap delivery only to the confirmed Resend owner's admin.
+  RESEND_ADMIN_OWNER_EMAIL: z.union([z.literal(''), z.string().trim().email().max(254).transform(value => value.toLowerCase())]).default(''),
+  RESEND_ADMIN_OWNER_USER_ID: z.union([z.literal(''), z.string().uuid()]).default(''),
   // Photon permits search-as-you-type; its public demo is for modest traffic only.
   ADDRESS_PHOTON_URL: z.string().url().default('https://photon.komoot.io/api/'),
   ADDRESS_SEARCH_INTERVAL_MS: z.coerce.number().int().min(1000).default(1100),
@@ -26,6 +29,9 @@ const schema = z.object({
 });
 
 export const configSchema = schema.superRefine((value, context) => {
+  if (Boolean(value.RESEND_ADMIN_OWNER_EMAIL) !== Boolean(value.RESEND_ADMIN_OWNER_USER_ID)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['RESEND_ADMIN_OWNER_USER_ID'], message: 'Owner-only admin delivery requires both the confirmed owner email and administrator Auth ID.' });
+  }
   const addressProvider = new URL(value.ADDRESS_PHOTON_URL);
   if (!['http:', 'https:'].includes(addressProvider.protocol) || addressProvider.username || addressProvider.password || addressProvider.search || addressProvider.hash) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['ADDRESS_PHOTON_URL'], message: 'Use an HTTP(S) Photon search endpoint without credentials, a query or fragment.' });

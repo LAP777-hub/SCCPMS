@@ -24,6 +24,7 @@ test('OTP delivery leases, acknowledgement transactions and retries preserve rea
   const originalId = randomUUID(), messageId = randomUUID();
   const originalValidity = config.OTP_VALIDITY_SECONDS;
   const migration = await readFile(new URL('../sql/022_otp_delivery_timing.sql', import.meta.url), 'utf8');
+  const senderMigration = await readFile(new URL('../sql/023_otp_sender_binding.sql', import.meta.url), 'utf8');
   const cooldown = (error: unknown) => error instanceof OtpChallengeError && error.code === 'OTP_RESEND_COOLDOWN' && error.retryAfterSeconds > 0;
   try {
     await control.query(`CREATE SCHEMA "${schema}"`);
@@ -44,10 +45,13 @@ test('OTP delivery leases, acknowledgement transactions and retries preserve rea
     const original = (await database.query('SELECT * FROM otp_challenges WHERE id=$1', [originalId])).rows[0];
     await database.query(migration);
     await database.query(migration);
+    await database.query(senderMigration);
+    await database.query(senderMigration);
     const migrated = (await database.query('SELECT * FROM otp_challenges WHERE id=$1', [originalId])).rows[0];
     assert.deepEqual(migrated.expires_at, original.expires_at);
     assert.equal(migrated.code_version, 0);
     assert.equal(migrated.accepted_at, null);
+    assert.equal(migrated.sender_from, null);
 
     const failedLease = await reserveOtpChallenge(database, identity);
     assert.match(challengeCode(identity, failedLease.id), /^[1-9][0-9]{5}$/);
@@ -62,7 +66,9 @@ test('OTP delivery leases, acknowledgement transactions and retries preserve rea
     await assert.rejects(reserveOtpChallenge(database, identity), cooldown);
     await database.query('UPDATE otp_challenges SET retry_after_at=now()-interval \'1 second\' WHERE id=$1', [failedLease.id]);
 
-    const uncertainLease = await reserveOtpChallenge(database, identity);
+    const savedSender = 'SCCPMS <login@original-sender-fixture.co.za>';
+    const uncertainLease = await reserveOtpChallenge(database, identity, savedSender);
+    assert.equal((await database.query('SELECT sender_from FROM otp_challenges WHERE id=$1', [uncertainLease.id])).rows[0].sender_from, savedSender);
     const sameCode = challengeCode(identity, uncertainLease.id);
     await recordOtpDeliveryFailure(database, identity, uncertainLease, 'unknown', 2);
     const pending = (await database.query('SELECT * FROM otp_challenges WHERE id=$1', [uncertainLease.id])).rows[0];
@@ -76,6 +82,7 @@ test('OTP delivery leases, acknowledgement transactions and retries preserve rea
     config.OTP_VALIDITY_SECONDS = originalValidity;
     assert.equal(retry.id, uncertainLease.id);
     assert.equal(retry.validitySeconds, uncertainLease.validitySeconds);
+    assert.equal(retry.senderFrom, savedSender);
     assert.equal(challengeCode(identity, retry.id), sameCode);
     assert.equal((await database.query('SELECT count(*)::int AS count FROM otp_challenges WHERE user_id=$1', [identity.userId])).rows[0].count, 3);
 

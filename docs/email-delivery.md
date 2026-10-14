@@ -10,6 +10,16 @@ SPU IT can publish [the prepared DNS records](../RESEND_UNIVERSITY_DNS.md) witho
 
 The hosted API currently uses `SCCPMS <login@clinic.spu.ac.za>`. Keep it pending until the corresponding domain is verified, or update `RESEND_FROM_EMAIL` to the approved sender in the API's Vercel environment and redeploy. Keep `RESEND_API_KEY` in private hosting secrets or ignored `server/.env`, never in a frontend variable. The sender domain must have sending enabled and click/open tracking disabled for authentication links.
 
+## Temporary access for the Resend owner administrator
+
+The user confirmed that their existing administrator email is also the Resend account email. The API has an optional owner-only route that sends a real login OTP from `SCCPMS <onboarding@resend.dev>` to that administrator. This is Resend's documented default-sender restriction, not a general production sender. [Resend owner-only sender](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
+
+`RESEND_ADMIN_OWNER_EMAIL` and `RESEND_ADMIN_OWNER_USER_ID` are configured together in private API settings. The server requires a confirmed active account with trusted `admin` role, the exact configured Auth ID, and matching authenticated email and recipient. Other roles, IDs and emails continue using `RESEND_FROM_EMAIL`. The global production sender remains a custom domain; production mode, credentials, OTP verification, single-use hashes, session binding, expiry and attempt limits remain enforced.
+
+Migration `023_otp_sender_binding.sql` retains each challenge's exact sender, so a retry cannot change its provider payload when deployment settings change. Legacy unknown deliveries stay on the primary sender. Remove both owner settings and redeploy after the main sender is verified; ordinary clinic mail and Supabase custom SMTP still require that verified sender. A domain-readiness check describes the main sender and can remain blocked while this one administrator route works.
+
+A delivery-check email containing no login code was accepted by Resend and reported delivered on 14 October. Real OTPs are generated only by the normal authenticated sign-in flow; request a fresh code from the live application.
+
 ## Configure Supabase mail after verification
 
 Use Node 22.12+ from a secured administrative computer. The runner reads ignored `server/.env`; set `FRONTEND_ORIGIN=https://sccpms.vercel.app`, the approved `RESEND_FROM_EMAIL`, and private `SUPABASE_ACCESS_TOKEN` and `RESEND_API_KEY` there. Never paste credentials into commands, issue bodies or committed files.

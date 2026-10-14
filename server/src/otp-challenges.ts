@@ -11,6 +11,7 @@ export interface OtpLease {
   providerMessageId: string | null;
   acceptedAt: Date | null;
   newlyCreated?: boolean;
+  senderFrom?: string;
 }
 export class OtpChallengeError extends Error {
   constructor(public readonly code: 'OTP_RESEND_COOLDOWN' | 'OTP_HOURLY_LIMIT' | 'OTP_CHALLENGE_REVOKED', public readonly status: number, public readonly retryAfterSeconds = 0) {
@@ -62,18 +63,18 @@ export async function readOtpState(database: Pick<Pool, 'query'>, identity: OtpI
   return { verified: Boolean(row?.verified), activeExpiresAt: row?.active_expires_at ? new Date(row.active_expires_at) : null, retryAfterSeconds: Number(row?.retry_after_seconds ?? 0) };
 }
 
-export async function reserveOtpChallenge(database: Database, identity: OtpIdentity): Promise<OtpLease> {
+export async function reserveOtpChallenge(database: Database, identity: OtpIdentity, requestedSender = config.RESEND_FROM_EMAIL): Promise<OtpLease> {
   const client = await database.connect();
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`otp-send:${identity.userId}`]);
     const result = await client.query<{
       hourly_count: number; retry_after_seconds: number;
-      id: string | null; validity_seconds: number | null; provider_message_id: string | null; accepted_at: Date | null;
+      id: string | null; validity_seconds: number | null; provider_message_id: string | null; accepted_at: Date | null; sender_from: string | null;
     }>(`${policyCte}
-      SELECT policy.*, pending.id, pending.validity_seconds, pending.provider_message_id, pending.accepted_at
+      SELECT policy.*, pending.id, pending.validity_seconds, pending.provider_message_id, pending.accepted_at, pending.sender_from
       FROM policy LEFT JOIN LATERAL (
-        SELECT id, validity_seconds, provider_message_id, accepted_at FROM recent
+        SELECT id, validity_seconds, provider_message_id, accepted_at, sender_from FROM recent
         WHERE session_id = $2 AND email_hash = $3 AND delivery_state = 'pending' AND consumed_at IS NULL
           AND code_version = 1 AND sent_at > now() - interval '15 minutes'
           AND (accepted_at IS NULL OR accepted_at + make_interval(secs => validity_seconds::int) > now())
@@ -85,11 +86,14 @@ export async function reserveOtpChallenge(database: Database, identity: OtpIdent
 
     const id = state?.id ?? randomUUID();
     const validitySeconds = state?.id ? Number(state.validity_seconds) : config.OTP_VALIDITY_SECONDS;
+    // Legacy pending drafts used the main sender. Never reinterpret an uncertain
+    // old delivery as an owner-only request with a different provider payload.
+    const senderFrom = state?.id ? state.sender_from ?? config.RESEND_FROM_EMAIL : requestedSender;
     if (state?.id) {
       const updated = await client.query(`UPDATE otp_challenges
-        SET delivery_attempt_at = now(), retry_after_at = now() + interval '30 seconds'
+        SET delivery_attempt_at = now(), retry_after_at = now() + interval '30 seconds', sender_from = COALESCE(sender_from, $5)
         WHERE id = $1 AND user_id = $2 AND session_id = $3 AND email_hash = $4
-          AND delivery_state = 'pending' AND consumed_at IS NULL`, [id, identity.userId, identity.sessionId, identity.emailHash]);
+          AND delivery_state = 'pending' AND consumed_at IS NULL`, [id, identity.userId, identity.sessionId, identity.emailHash, senderFrom]);
       if (!updated.rowCount) throw new OtpChallengeError('OTP_CHALLENGE_REVOKED', 409);
     } else {
       // Retire abandoned drafts only. An already accepted code stays usable until
@@ -98,12 +102,12 @@ export async function reserveOtpChallenge(database: Database, identity: OtpIdent
         UPDATE otp_challenges SET consumed_at = now()
         WHERE user_id = $2 AND session_id = $3 AND delivery_state = 'pending' AND consumed_at IS NULL
       ) INSERT INTO otp_challenges
-        (id, user_id, session_id, code_hash, email_hash, expires_at, validity_seconds, code_version, delivery_attempt_at, retry_after_at)
-        VALUES ($1, $2, $3, $4, $5, now() + interval '15 minutes', $6, 1, now(), now() + interval '30 seconds')`,
-      [id, identity.userId, identity.sessionId, otpCodeHash(identity.userId, identity.sessionId, identity.emailHash, challengeCode(identity, id)).toString('hex'), identity.emailHash, validitySeconds]);
+        (id, user_id, session_id, code_hash, email_hash, expires_at, validity_seconds, code_version, delivery_attempt_at, retry_after_at, sender_from)
+        VALUES ($1, $2, $3, $4, $5, now() + interval '15 minutes', $6, 1, now(), now() + interval '30 seconds', $7)`,
+      [id, identity.userId, identity.sessionId, otpCodeHash(identity.userId, identity.sessionId, identity.emailHash, challengeCode(identity, id)).toString('hex'), identity.emailHash, validitySeconds, senderFrom]);
     }
     await client.query('COMMIT');
-    return { id, validitySeconds, providerMessageId: state?.provider_message_id ?? null, acceptedAt: state?.accepted_at ? new Date(state.accepted_at) : null, newlyCreated: !state?.id };
+    return { id, validitySeconds, providerMessageId: state?.provider_message_id ?? null, acceptedAt: state?.accepted_at ? new Date(state.accepted_at) : null, newlyCreated: !state?.id, senderFrom };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
