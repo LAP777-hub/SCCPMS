@@ -1,11 +1,13 @@
 # Confirmation and invitation email links
 
-Production templates now use an intermediate page at the live frontend with
+Prepared production templates use an intermediate page at the live frontend with
 `email_action=signup|invite|recovery` and an encoded `confirmation_url`. Loading
 this page does not verify the token. The recipient clicks Continue to follow a
 validated URL at the configured Supabase project, then returns to the existing
 `auth_action` callback below. This protects against email prefetching; links are
-still single use. New Auth links have a two-hour expiry after template setup.
+still single use. New Auth links have a two-hour expiry after link setup.
+The live page is deployed, but the hosted free-tier project requires custom SMTP
+before installing these templates; its default templates remain active until then.
 [Configuration, SMTP and live acceptance](email-delivery.md).
 
 SCCPMS uses the configured `FRONTEND_ORIGIN` for new email links. In development

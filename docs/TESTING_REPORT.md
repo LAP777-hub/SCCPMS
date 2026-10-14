@@ -2,7 +2,7 @@
 
 **Report date:** 14 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the previous Git-connected Vercel release is live. The 14 October email changes pass **259 server cases with six intentional database skips**, eight additional configuration cases, a real OTP database case, and a **35/35 focused browser rerun** after four failures in the initial full 92-case run. Publication/cloud checks for these changes are recorded in section 11e as they complete. University sender DNS verification, custom SMTP and actual received-email/clinical acceptance remain incomplete; SPU's subdomain response is pending. Local university-network failures remain separately recorded.
+**Status:** the 14 October email changes are live on both Git-connected Vercel projects. Cloud browser checks pass **95/95** and server unit checks pass **273 with six intentional database skips**. Two database fixture failures in that first workflow were corrected and both affected suites pass on real PostgreSQL with verified TLS. Final cloud rerun results are recorded in section 11e. All valid recipient emails are accepted; sender DNS verification, custom SMTP and actual received-email/clinical acceptance remain incomplete. SPU's subdomain response is pending. Local university-network failures remain separately recorded.
 
 This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
@@ -37,7 +37,7 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest full server run | **214 total: 209 passed, 5 skipped, 0 failed** | Node22.23.3,75.5s; five database cases opt in; includes serverless realtime/pool/audit/TLS/shared-limit regressions |
+| Latest completed cloud server unit run | **279 total: 273 passed, 6 skipped, 0 failed** | Node22; six real database cases opt in; first Oct14 implementation workflow, before the three later operator-runner checks |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
@@ -60,7 +60,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **79 passed, 0 failed** | GitHub Linux CI for `ddc456a`, 1.2 minutes; deterministic profile/OTP race and existing role/session/registration checks pass |
+| Latest full browser run | **95 passed, 0 failed** | GitHub Linux CI for `f361feb`, 1.5 minutes; corrected email flows, unrestricted recipient email, logout fallback and existing roles/registration/session checks |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -947,6 +947,16 @@ The user then requested that every email be acceptable. The active frontend, sta
 The corrected registration/Auth/persistence/phone regression command passed **63/63**, with no skips, on actual Node22 in 33.803s. It includes Gmail/Outlook/Yahoo/custom-domain acceptance, all four role authentications, malformed-address rejection, unconfirmed/suspended accounts and identity requirements. A real database fixture now uses a personal email unrelated to its student number and verifies the persisted email/number alongside its address/programme. Full browser/cloud results are recorded below as they complete.
 
 The subsequent full browser run passed **94/95** in 2.7 minutes, including the blocked-storage/logout recovery case. Its single failure was the new doctor's invitation fixture using an exact accessible-name selector for a wrapped specialty select; the actual label includes option text. The fixture now uses the existing label's supported substring match. This failed run remains in `test-results/ui-email-policy/`; its correction is checked separately before cloud publication.
+
+### Publication, provider restrictions and fixture corrections
+
+Implementation commit [`f361feb`](https://github.com/LAP777-hub/SCCPMS/commit/f361feb5b918ba420450b4f0470428724b36c72d) was published to GitHub. Both Vercel production projects reached READY for that commit. The local corrected staff-invitation tests passed **2/2** in 10.9s. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38616990188) passed frontend **95/95** and security checks; server units passed **279 total, 273 passed, six explicit database skips**. The separate database command passed **4/6**, failing two test fixtures: a repeated profile SELECT omitted the newly asserted email/number columns, and the older workflow's migration list omitted022. The assertions and migration fixture were repaired without application code changes. Both affected suites subsequently passed **2/2, no skips**, on actual Node22 with verified TLS in 127.81s; both temporary schemas were cleaned up. The first cloud workflow remains recorded as failed.
+
+Read-only checks against the deployed frontend passed **8/8**: signup, invitation, recovery and foreign-provider rejection at desktop1440x900 and mobile390x844. Continue controls were visible and at least44x44; URLs were scrubbed, with no overflow, runtime errors, verification requests or mutations. Continue was never clicked. The deployed HTTP suite passed **7/7**, including API/database health200, protected GET/POST401, production CORS204, frontend assets/deep links and JSON404.
+
+The hosted template PATCH returned **HTTP400**: Supabase's free-tier default email provider does not allow template customization until custom SMTP is configured. No templates were saved. The runner now makes that prerequisite explicit, provides a separate `--apply-links` operation, and retries only bounded GET reads when management configuration briefly lags after an accepted PATCH. Its corrected configuration suite passed **11/11**, zero skips, 5.807s under mocked providers.
+
+Hosted link settings were saved: Site URL remains `https://sccpms.vercel.app`, old redirects are retained, confirmation remains enabled, and new Auth links expire after **7200 seconds**. The immediate readback was temporarily stale and reported a mismatch; later readback and an idempotent runner check verified all four link fields, unchanged SMTP and saved7200s. The prepared branded scanner-resistant templates remain unapplied. SMTP activation returned `blocked/domain_pending` with zero SMTP mutation; Resend still reports `clinic.spu.ac.za` as `not_started`. No real messages or Auth accounts were created by these checks. Full Git index publication scan passed **466 files, zero private-credential/archive findings**.
 
 ## 12. Supporting documents
 

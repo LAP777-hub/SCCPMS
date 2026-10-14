@@ -61,10 +61,14 @@ function validateManaged(value) {
   return value;
 }
 
-export function buildTemplatePatch(current, frontendOrigin) {
+export function buildLinkPatch(current, frontendOrigin) {
   const origin = productionOrigin(frontendOrigin);
   const previous = current.uri_allow_list.split(',').map(value => value.trim()).filter(Boolean);
-  const patch = { site_url: origin, uri_allow_list: [...new Set([...previous, ...requiredAuthRedirects(origin)])].join(','), mailer_otp_exp: 7200, mailer_autoconfirm: false };
+  return { site_url: origin, uri_allow_list: [...new Set([...previous, ...requiredAuthRedirects(origin)])].join(','), mailer_otp_exp: 7200, mailer_autoconfirm: false };
+}
+
+export function buildTemplatePatch(current, frontendOrigin) {
+  const patch = buildLinkPatch(current, frontendOrigin);
   for (const [flow, action, title, button] of flows) {
     patch[`mailer_subjects_${flow}`] = `SCCPMS: ${title}`;
     // GoTrue renders Go html/template; urlquery is its standard URL-query encoder.
@@ -119,13 +123,19 @@ function summary(current, settings) {
 }
 
 export async function configureAuthEmail(settings, mode = 'inspect', fetcher = fetch) {
-  if (!['inspect', 'apply-templates', 'apply-smtp'].includes(mode)) throw new AuthEmailSettingsError('unsupported_operation');
+  if (!['inspect', 'apply-links', 'apply-templates', 'apply-smtp'].includes(mode)) throw new AuthEmailSettingsError('unsupported_operation');
   const endpoint = managementUrl(settings);
-  if (mode === 'apply-templates') productionOrigin(settings.frontendOrigin);
+  if (['apply-links', 'apply-templates'].includes(mode)) productionOrigin(settings.frontendOrigin);
   const current = validateManaged(await request(endpoint, settings.managementToken, fetcher));
   if (mode === 'inspect') return { operation: mode, status: 'inspected', ...summary(current, settings), smtpGate: await inspectSenderDomain(settings, fetcher) };
   let patch;
-  if (mode === 'apply-templates') patch = buildTemplatePatch(current, settings.frontendOrigin);
+  if (mode === 'apply-links') patch = buildLinkPatch(current, settings.frontendOrigin);
+  else if (mode === 'apply-templates') {
+    // Hosted free-tier Auth refuses template changes with its default provider.
+    // Prepare links independently, then install templates after verified SMTP.
+    if (!summary(current, settings).smtpConfigured) return { operation: mode, status: 'blocked', reason: 'custom_smtp_required_for_templates', ...summary(current, settings), dnsDocPath };
+    patch = buildTemplatePatch(current, settings.frontendOrigin);
+  }
   else {
     const gate = await inspectSenderDomain(settings, fetcher);
     if (!gate.ready) return { operation: mode, status: 'blocked', ...summary(current, settings), smtpGate: gate };
@@ -136,18 +146,25 @@ export async function configureAuthEmail(settings, mode = 'inspect', fetcher = f
   }
   const changed = Object.entries(patch).some(([key, value]) => current[key] !== value);
   if (changed) await request(endpoint, settings.managementToken, fetcher, patch);
-  const saved = validateManaged(await request(endpoint, settings.managementToken, fetcher));
-  const verified = Object.entries(patch).every(([key, value]) => saved[key] === value);
-  const preserved = mode === 'apply-templates' ? smtpFields.every(key => saved[key] === current[key])
-    : saved.uri_allow_list === current.uri_allow_list && saved.site_url === current.site_url;
-  if (!verified || !preserved) throw new AuthEmailSettingsError('management_readback_mismatch');
+  let saved, matched = false;
+  // The management API can briefly return the prior configuration after a
+  // successful PATCH. Retry only reads; never send another settings mutation.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, attempt * 500));
+    saved = validateManaged(await request(endpoint, settings.managementToken, fetcher));
+    const verified = Object.entries(patch).every(([key, value]) => saved[key] === value);
+    const preserved = mode !== 'apply-smtp' ? smtpFields.every(key => saved[key] === current[key])
+      : saved.uri_allow_list === current.uri_allow_list && saved.site_url === current.site_url;
+    if (verified && preserved) { matched = true; break; }
+  }
+  if (!matched) throw new AuthEmailSettingsError('management_readback_mismatch');
   return { operation: mode, status: changed ? 'applied' : 'unchanged', ...summary(saved, settings), existingRedirectsPreserved: true,
-    ...(mode === 'apply-templates' ? { smtpUnchanged: true, templatesVerified: true } : { smtpVerified: true }) };
+    ...(mode === 'apply-templates' ? { smtpUnchanged: true, templatesVerified: true } : mode === 'apply-links' ? { smtpUnchanged: true, linksVerified: true } : { smtpVerified: true }) };
 }
 
 async function main() {
   const argumentsList = process.argv.slice(2);
-  if (argumentsList.length > 1 || argumentsList.some(value => !['--inspect', '--apply-templates', '--apply-smtp'].includes(value))) throw new AuthEmailSettingsError('choose_one_operation');
+  if (argumentsList.length > 1 || argumentsList.some(value => !['--inspect', '--apply-links', '--apply-templates', '--apply-smtp'].includes(value))) throw new AuthEmailSettingsError('choose_one_operation');
   const result = await configureAuthEmail({ supabaseUrl: process.env.SUPABASE_URL, managementToken: process.env.SUPABASE_ACCESS_TOKEN,
     frontendOrigin: process.env.FRONTEND_ORIGIN, apiKey: process.env.RESEND_API_KEY, fromEmail: process.env.RESEND_FROM_EMAIL }, argumentsList[0]?.slice(2) ?? 'inspect');
   console.log(JSON.stringify(result, null, 2));

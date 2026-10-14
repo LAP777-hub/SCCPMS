@@ -103,6 +103,47 @@ test('template mutation rejects insecure or malformed frontend origins before re
   }
 });
 
+test('link settings can be repaired before custom SMTP without changing mail templates or sending messages', async () => {
+  const mock = provider();
+  mock.current.smtp_host = null; mock.current.smtp_user = null; mock.current.smtp_pass = null;
+  const before = { ...mock.current };
+  const result = await configureAuthEmail({ ...settings, apiKey: '' }, 'apply-links', mock.fetcher);
+  assert.equal(result.status, 'applied');
+  assert.equal(result.linksVerified, true);
+  assert.equal(result.smtpUnchanged, true);
+  assert.equal(result.authLinkExpirySeconds, 7200);
+  assert.deepEqual(Object.keys(mock.writes[0]).sort(), ['mailer_autoconfirm', 'mailer_otp_exp', 'site_url', 'uri_allow_list']);
+  assert.ok(String(mock.current.uri_allow_list).includes(before.uri_allow_list as string));
+  for (const key of Object.keys(before).filter(key => key.startsWith('smtp_') || key === 'rate_limit_email_sent')) assert.equal(mock.current[key], before[key]);
+  assert.equal(mock.requests.some(request => request.url.includes('api.resend.com')), false);
+});
+
+test('template setup reports the custom SMTP prerequisite without a rejected free-tier mutation', async () => {
+  const mock = provider();
+  mock.current.smtp_host = null; mock.current.smtp_user = null; mock.current.smtp_pass = null;
+  const before = { ...mock.current };
+  const result = await configureAuthEmail(settings, 'apply-templates', mock.fetcher);
+  assert.equal(result.status, 'blocked');
+  assert.equal(result.reason, 'custom_smtp_required_for_templates');
+  assert.equal(result.smtpConfigured, false);
+  assert.equal(result.dnsDocPath, 'docs/email-delivery.md');
+  assert.equal(mock.writes.length, 0);
+  assert.deepEqual(mock.current, before);
+});
+
+test('briefly stale management readback retries only GET and never duplicates the accepted settings patch', async () => {
+  const mock = provider();
+  let reads = 0;
+  const result = await configureAuthEmail(settings, 'apply-links', async (input: string | URL, init: RequestInit) => {
+    if (init.method === 'GET' && new URL(input).hostname === 'api.supabase.com' && ++reads === 2) return Response.json(initial());
+    return mock.fetcher(input, init);
+  });
+  assert.equal(result.status, 'applied');
+  assert.equal(result.linksVerified, true);
+  assert.equal(reads, 3);
+  assert.equal(mock.writes.length, 1);
+});
+
 test('SMTP remains unchanged when sender domain is pending, sending disabled, tracking enabled or sender is a test domain', async () => {
   const scenarios = [
     { changed: { ...domain, status: 'not_started' }, reason: 'domain_pending' },

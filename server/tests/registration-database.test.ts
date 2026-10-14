@@ -122,7 +122,7 @@ test('registration address and academic details persist in an isolated database 
     }
     await query(migration);
     assert.deepEqual((await query('SELECT role,address_latitude,address_longitude,address_source FROM profiles WHERE id=$1', [legacyId])).rows[0], { role: 'admin', address_latitude: null, address_longitude: null, address_source: null });
-    assert.deepEqual((await query('SELECT role,department,program,address_line1,address_latitude,address_longitude,address_source FROM profiles WHERE id=$1', [mappedId])).rows[0], mappedProfile, 'reapplying the additive migration preserves registered data');
+    assert.deepEqual((await query('SELECT role,email,student_number,department,program,address_line1,address_latitude,address_longitude,address_source FROM profiles WHERE id=$1', [mappedId])).rows[0], mappedProfile, 'reapplying the additive migration preserves registered data');
   } finally {
     mock.restoreAll();
     await query('ROLLBACK').catch(() => undefined);

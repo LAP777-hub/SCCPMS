@@ -125,6 +125,7 @@ test(
         '015_otp_email_binding.sql',
         '016_manual_logout_sessions.sql',
         '019_patient_account_deletion.sql',
+        '022_otp_delivery_timing.sql',
       ]) {
         await rawDbQuery(await readFile(new URL(`../sql/${file}`, import.meta.url), 'utf8'));
       }

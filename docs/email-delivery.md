@@ -21,13 +21,13 @@ npm run email:check --prefix server -- --production
 
 Inspection is read-only and returns status categories without passwords or mailbox addresses. A sending-only Resend key cannot inspect domains; use a domain-readable administrative key for this operation. The API can retain a restricted sending key.
 
-Deploy the frontend with `email_action` support **before** updating hosted templates:
+Deploy the frontend with `email_action` support before updating hosted templates. Link settings can be updated while SMTP is pending:
 
 ```sh
-npm run auth:configure-email --prefix server -- --apply-templates
+npm run auth:configure-email --prefix server -- --apply-links
 ```
 
-This sets the production Site URL, preserves existing redirect entries, adds required production callbacks, installs three branded confirmation/invitation/recovery templates, sets new Auth links to two hours, and keeps email confirmation enabled. It leaves SMTP unchanged. Each email first opens the live application; only an explicit Continue click follows its validated Supabase verification URL. This reduces accidental consumption by email scanners. Existing emailed links retain their original expiry and cannot be restored after use.
+This sets the production Site URL, preserves existing redirect entries, adds required production callbacks, sets new Auth links to two hours, and keeps email confirmation enabled. It leaves SMTP and templates unchanged. Existing emailed links retain their original expiry and cannot be restored after use.
 
 When the sender domain is verified:
 
@@ -36,6 +36,14 @@ npm run auth:configure-email --prefix server -- --apply-smtp
 ```
 
 The runner refuses to change SMTP unless the exact sender domain is verified, sending is enabled and tracking is disabled. It configures `smtp.resend.com`, port 465, username `resend`, the private API key as password, and the approved sender; sets a 30-second mail cooldown and an Auth email quota of at least 30/hour; and verifies saved settings without printing credentials. Adjust quotas for measured traffic and the Resend plan. [Resend's Supabase SMTP setup](https://resend.com/docs/send-with-supabase-smtp).
+
+After custom SMTP is configured, install the branded templates:
+
+```sh
+npm run auth:configure-email --prefix server -- --apply-templates
+```
+
+The hosted free-tier project rejected template changes with its default mail provider (HTTP 400 on 14 October). The runner now reports the custom-SMTP prerequisite without attempting that rejected mutation. Templates are prepared in code but remain unapplied until SMTP is ready. Once installed, each email first opens the live application; only an explicit Continue click follows its validated Supabase verification URL. This reduces accidental consumption by email scanners.
 
 Supabase's default mail service is restricted to project-team addresses and two messages/hour, with no delivery SLA. Production university mail needs custom SMTP. [Supabase SMTP documentation](https://supabase.com/docs/guides/auth/auth-smtp).
 
