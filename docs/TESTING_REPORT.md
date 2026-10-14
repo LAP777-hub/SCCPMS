@@ -2,7 +2,7 @@
 
 **Report date:** 14 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** all valid recipient emails are accepted, and the SPU sender plan was canceled on 14 October. No replacement sending domain or SMTP account is available yet. The preceding owner-route release is live on both Git-connected Vercel projects, with **95/95 browser tests**, **301 server unit passes with six intentional database skips**, **six real database passes**, and security checks. Real administrator delivery was accepted and reported delivered; a live OTP/login round trip still requires the user's request and code entry. The cancellation update passes its local checks in section 11g; its publication results are recorded there when complete. General mail delivery and clinical acceptance remain incomplete. Earlier failures and corrections remain recorded below.
+**Status:** all valid recipient emails are accepted, and the SPU sender plan was canceled on 14 October. Its primary sending address has been removed from hosting, and the API redeployed. Both Git-connected Vercel projects are READY for the cancellation implementation, with **95/95 browser tests**, **306 server unit passes with six intentional database skips**, **six real database passes**, security checks and **7/7 live HTTP checks**. The existing bound administrator OTP route remains available; its earlier delivery check was reported delivered, while a live OTP/login round trip still requires the user's request and code entry. No replacement sending domain or SMTP account is available yet, so general mail delivery and clinical acceptance remain incomplete. Earlier failures and corrections remain recorded below.
 
 This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
@@ -37,7 +37,7 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest completed cloud server unit run | **307 total: 301 passed, 6 skipped, 0 failed** | Node22; six real database cases opt in; owner-route implementation workflow |
+| Latest completed cloud server unit run | **312 total: 306 passed, 6 skipped, 0 failed** | Node22; six real database cases opt in; cancellation implementation workflow |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
@@ -60,7 +60,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **95 passed, 0 failed** | GitHub Linux CI for `a53f3df`, 1.4 minutes; email flows, unrestricted recipient email, logout fallback and existing roles/registration/session checks |
+| Latest full browser run | **95 passed, 0 failed** | GitHub Linux CI for `0c413b1`, 1.4 minutes; email flows, unrestricted recipient email, logout fallback and existing roles/registration/session checks |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -1013,7 +1013,26 @@ no longer a required setup step. Accepting an email address does not establish
 delivery: other-role OTPs and general confirmation/invitation/recovery mail
 remain unavailable until a replacement sender and Supabase custom SMTP are
 configured. No new messages, users or account/clinical data were created by
-this change. Publication and production checks are recorded below when complete.
+this change.
+
+Implementation commit [`0c413b1`](https://github.com/LAP777-hub/SCCPMS/commit/0c413b15e7031ac0f49a2d17c07cc193028a1eee)
+is published. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38639060199)
+passes all three jobs: server **312 total / 306 passed / six explicit database
+skips / zero failures**, separate isolated PostgreSQL **6/6 without skips**, browser
+**95/95** in 1.4 minutes, and security checks. The index publication scan passed
+**469 files, zero findings**. Both production projects are READY for that code.
+The API was redeployed after removal of the former primary sender; its 17
+remaining production settings retain the private owner binding and production
+mode. The ignored local primary sender is also empty. No school DNS or account
+records were changed.
+
+The post-removal HTTP check passed **7/7**, including frontend/API/database health
+200, protected GET/POST401, production CORS204 and JSON404. Environment syntax
+validation passed and explicitly reports general delivery unavailable. The
+read-only production sender check returned its expected configuration-unavailable
+result with no provider lookup or message. This is the honest current setup
+boundary, not a successful general-email delivery test. The final documentation
+update changes no application code.
 
 ## 12. Supporting documents
 
