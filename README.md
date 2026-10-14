@@ -9,7 +9,7 @@ For GitHub-to-Vercel deployment, use [the deployment guide](docs/vercel-deployme
 | Frontend | Reuse `sccpms` | Repository root (`.`) | Vite: `npm run build`, output `dist` |
 | API | `sccpms-api` | `server` | Express: `npm run build` |
 
-The live frontend is [sccpms.vercel.app](https://sccpms.vercel.app); the live API is [sccpms-api.vercel.app](https://sccpms-api.vercel.app), with a passing [database health check](https://sccpms-api.vercel.app/healthz). Both deploy automatically from this repository's `main` branch and have separate environment variables and `vercel.json`. GitHub CI passes, including all 79 browser tests. University sender DNS verification, SMTP/inbox delivery and operational acceptance remain required before clinic use. [Testing results and failure history](docs/TESTING_REPORT.md).
+The live frontend is [sccpms.vercel.app](https://sccpms.vercel.app); the live API is [sccpms-api.vercel.app](https://sccpms-api.vercel.app), with a passing [database health check](https://sccpms-api.vercel.app/healthz). Both deploy automatically from this repository's `main` branch and have separate environment variables and `vercel.json`. GitHub CI passes **95 browser tests, 276 server checks and six real database cases**, with six explicit database skips in the unit command. Sender DNS verification, custom SMTP, inbox delivery and operational acceptance remain required before clinic use. [Testing results and failure history](docs/TESTING_REPORT.md).
 
 ## Project layout
 

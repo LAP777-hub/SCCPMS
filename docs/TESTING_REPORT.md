@@ -2,7 +2,7 @@
 
 **Report date:** 14 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the 14 October email changes are live on both Git-connected Vercel projects. Cloud browser checks pass **95/95** and server unit checks pass **273 with six intentional database skips**. Two database fixture failures in that first workflow were corrected and both affected suites pass on real PostgreSQL with verified TLS. Final cloud rerun results are recorded in section 11e. All valid recipient emails are accepted; sender DNS verification, custom SMTP and actual received-email/clinical acceptance remain incomplete. SPU's subdomain response is pending. Local university-network failures remain separately recorded.
+**Status:** the 14 October email changes are live on both Git-connected Vercel projects. The final implementation workflow passes **95/95 browser tests**, **276 server unit checks with six intentional database skips**, **six real database cases without skips**, and security checks. Earlier browser/database/configuration failures and their corrections are retained below. All valid recipient emails are accepted; sender DNS verification, custom SMTP and actual received-email/clinical acceptance remain incomplete. SPU's subdomain response is pending. Local university-network failures remain separately recorded.
 
 This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
@@ -37,11 +37,11 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest completed cloud server unit run | **279 total: 273 passed, 6 skipped, 0 failed** | Node22; six real database cases opt in; first Oct14 implementation workflow, before the three later operator-runner checks |
+| Latest completed cloud server unit run | **282 total: 276 passed, 6 skipped, 0 failed** | Node22; six real database cases opt in; final Oct14 implementation workflow |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest stable isolated database command | **5/5 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI, 2.704s; includes private Auth audits, shared limits/budgets and late-commit revisions; local connection-reset failures retained in section 11d |
+| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI; includes OTP timing/recovery, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -60,7 +60,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **95 passed, 0 failed** | GitHub Linux CI for `f361feb`, 1.5 minutes; corrected email flows, unrestricted recipient email, logout fallback and existing roles/registration/session checks |
+| Latest full browser run | **95 passed, 0 failed** | GitHub Linux CI for `e5a6d82`, 1.4 minutes; email flows, unrestricted recipient email, logout fallback and existing roles/registration/session checks |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -241,7 +241,7 @@ Commands below are an inventory/reproduction guide, not a statement that every c
 | `npm run lint` | Active frontend/config/browser-test lint | Zero errors; one existing Fast Refresh warning plus `.eslintignore` deprecation notice |
 | `npm run typecheck --prefix server` | API TypeScript checks | Earlier no-emit command passed; latest successful TypeScript build also checks API types |
 | `npm run build --prefix server` | Compile/typecheck API | Latest build passed |
-| `npm test --prefix server` | Node test runner, all `server/tests/*.test.ts`, concurrency 1 | Latest CI: 214 total, 209 passed/five deliberate DB skips/zero failures, 41.407s |
+| `npm test --prefix server` | Node test runner, all `server/tests/*.test.ts`, concurrency 1 | Latest CI: 282 total, 276 passed/six deliberate DB skips/zero failures |
 | `npm run test:database --prefix server` | Opt-in isolated workflow/registration/deletion/serverless suites | Latest CI: 5/5 passed, zero skips/failures, 2.704s; local network failures remain documented |
 | `node --import tsx --test tests/trusted-auth.test.ts` from `server/` | Focused trusted Auth/provider/profile/ban behavior and safe timeout diagnostics | Latest 28/28 passed |
 | `npm --prefix server run connections:check` | Local frontend/API/CORS and upstream Auth/PostgreSQL connection checks; no messages/account changes | Expected exit 1 while database ports are unreachable; stable health 503 recorded |
@@ -276,9 +276,9 @@ Use one browser at a time when local resources are constrained. Playwright's def
 | Gate | Status |
 | --- | --- |
 | Latest application builds/typechecks | Pass; latest server TypeScript build checks API types |
-| Latest unit/policy/route regressions | Pass: 209/five explicit opt-in DB skips/zero failures on Node22 |
+| Latest unit/policy/route regressions | Pass: 276/six explicit opt-in DB skips/zero failures on Node22 |
 | Real isolated database regressions | Latest stable CI 5/5 passed; intermittent local connection-reset attempts remain recorded; temporary schemas cleaned |
-| Browser behavior and responsive acceptance under mocks | Latest full 79-test run passed; 128 earlier fixed-pane/readable-text views passed; prior failures retained |
+| Browser behavior and responsive acceptance under mocks | Latest full 95-test run passed; 128 earlier fixed-pane/readable-text views passed; prior failures retained |
 | New deletion/suspension final verification | Server and database pass; all 67 distinct browser cases verified through initial/focused correction runs; first full-command failures retained |
 | Deletion migration 019 on configured application database | Applied; four columns/two constraints verified read-only; no existing account deleted |
 | Current live API/database health | Pass: deployed API `/healthz`200 with verified database TLS; campus-network failures remain separately recorded |
@@ -920,7 +920,7 @@ Implemented changes:
 - Provider calls have a ten-second total budget and at most one retry for transient errors. Permanent sender/quota errors return promptly. Accepted acknowledgements survive a database-finalization retry; per-user reservations and failed-challenge limits are durable across instances. Late HTTP completion cannot write another response.
 - Confirmation/invitation/recovery emails open the live application before following their one-use Supabase verification link. An explicit Continue protects against email prefetching. Staff create and confirm their own passwords, then sign in using their trusted email/role and complete OTP; patients return to sign-in after confirmation. Authentication requests and logout have deadlines.
 - A fresh, provider-confirmed invitation with temporarily missing role/profile setup returns a bounded retry response, while invalid roles still fail closed. Callback SDK network errors offer retry; malformed implicit links retain invalid-link guidance. Late sign-in hints fill untouched inputs without replacing user typing.
-- A guarded operator runner prepares branded templates/two-hour Auth links independently of SMTP. SMTP changes require the exact Resend sender domain to be verified, sending enabled and tracking disabled. It preserves existing redirects and verifies saved configuration without printing secrets.
+- A guarded operator runner prepares two-hour Auth link settings independently of SMTP. Branded template installation requires custom SMTP. SMTP changes require the exact Resend sender domain to be verified, sending enabled and tracking disabled. The runner preserves existing redirects and verifies saved configuration without printing secrets.
 
 | Completed check | Result and boundary |
 | --- | --- |
@@ -938,7 +938,7 @@ The initial browser failures exposed two source issues and one duplicated test-f
 
 Read-only review found that the SDK can retain an in-memory session after a failed logout when browser storage is blocked. An explicit shared storage adapter and targeted regression address that fallback. Normal sign-in/password requests have a 12-second HTTP deadline; SDK token-refresh retries can take roughly 37 seconds during a stalled Auth service, so the per-request timeout is not a promise of a 12-second overall restoration. Provider acknowledgement and browser tests do not guarantee university inbox arrival within seconds.
 
-Cloud publication and template readback results will be appended after the Git-connected deployment completes. Real received mail, inbox timing and staff onboarding remain unverified until SPU supplies and verifies the sender subdomain and custom SMTP is activated. [Email setup and live acceptance](email-delivery.md).
+Cloud publication and template readback results follow below. Real received mail, inbox timing and staff onboarding remain unverified until SPU supplies and verifies the sender subdomain and custom SMTP is activated. [Email setup and live acceptance](email-delivery.md).
 
 ### Later recipient-email policy correction
 
@@ -957,6 +957,8 @@ Read-only checks against the deployed frontend passed **8/8**: signup, invitatio
 The hosted template PATCH returned **HTTP400**: Supabase's free-tier default email provider does not allow template customization until custom SMTP is configured. No templates were saved. The runner now makes that prerequisite explicit, provides a separate `--apply-links` operation, and retries only bounded GET reads when management configuration briefly lags after an accepted PATCH. Its corrected configuration suite passed **11/11**, zero skips, 5.807s under mocked providers.
 
 Hosted link settings were saved: Site URL remains `https://sccpms.vercel.app`, old redirects are retained, confirmation remains enabled, and new Auth links expire after **7200 seconds**. The immediate readback was temporarily stale and reported a mismatch; later readback and an idempotent runner check verified all four link fields, unchanged SMTP and saved7200s. The prepared branded scanner-resistant templates remain unapplied. SMTP activation returned `blocked/domain_pending` with zero SMTP mutation; Resend still reports `clinic.spu.ac.za` as `not_started`. No real messages or Auth accounts were created by these checks. Full Git index publication scan passed **466 files, zero private-credential/archive findings**.
+
+Final implementation commit [`e5a6d82`](https://github.com/LAP777-hub/SCCPMS/commit/e5a6d82e8ac0845d22e15825d7c2e5720db65190) is published, and both connected Vercel production deployments are READY. Its [full cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38618624563) passes all three jobs: browser **95/95** in 1.4 minutes, server unit **282 total / 276 passed / six intentional database skips / zero failures**, isolated PostgreSQL **6/6 with no skips/failures**, and publication/security checks. Runtime application code is unchanged by the final documentation update. Actual university/personal-inbox delivery remains blocked by the external sender/SMTP requirements above.
 
 ## 12. Supporting documents
 

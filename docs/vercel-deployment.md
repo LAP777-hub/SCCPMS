@@ -6,7 +6,8 @@ Both Vercel projects are linked to [LAP777-hub/SCCPMS](https://github.com/LAP777
 
 Both production deployments are READY. Live checks verify frontend assets/routing,
 API/database health 200, production CORS and protected GET/POST rejection. GitHub
-CI passes 79/79 browser cases plus backend/security jobs. Supabase Site URL and
+CI passes 95/95 browser cases, 276 server checks, six real database cases and
+security checks. Supabase Site URL and
 signup/invite/recovery redirects now target the production frontend; previous
 local callback URLs remain allowed. University email delivery still requires
 the sender-domain DNS and SMTP/inbox acceptance described below.
