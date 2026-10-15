@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export function useLiveRefresh(refresh: () => Promise<void>, intervalMs = 15_000) {
+export function useLiveRefresh(refresh: () => Promise<void>, intervalMs = 15_000, refreshKey?: unknown) {
   const latest = useRef(refresh);
   latest.current = refresh;
   useEffect(() => {
@@ -23,5 +23,5 @@ export function useLiveRefresh(refresh: () => Promise<void>, intervalMs = 15_000
     window.addEventListener('clinic:data-changed', resume);
     document.addEventListener('visibilitychange', resume);
     return () => { stopped = true; window.clearInterval(interval); window.removeEventListener('focus', resume); window.removeEventListener('clinic:data-changed', resume); document.removeEventListener('visibilitychange', resume); };
-  }, [intervalMs]);
+  }, [intervalMs, refreshKey]);
 }

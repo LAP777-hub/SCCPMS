@@ -1,8 +1,14 @@
 # SCCPMS testing report
 
-**Report date:** 14 October 2026 (Africa/Johannesburg)
+**Report date:** 15 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
 **Status:** all valid recipient emails are accepted, and the SPU sender plan was canceled on 14 October. Its primary sending address has been removed from hosting, and the API redeployed. Both Git-connected Vercel projects are READY for the cancellation implementation, with **95/95 browser tests**, **306 server unit passes with six intentional database skips**, **six real database passes**, security checks and **7/7 live HTTP checks**. The existing bound administrator OTP route remains available; its earlier delivery check was reported delivered, while a live OTP/login round trip still requires the user's request and code entry. No replacement sending domain or SMTP account is available yet, so general mail delivery and clinical acceptance remain incomplete. Earlier failures and corrections remain recorded below.
+
+**Release candidate on 15 October:** staff deletion, deleted-account Records,
+expanded reports and notification regressions pass local validation: **342
+server passes / six explicit database skips**, **99/99 browser cases**, and the
+affected real PostgreSQL cases. Migrations024/025 are applied. Source publication
+and hosted acceptance are recorded in section 11h as they complete.
 
 This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
@@ -1033,6 +1039,63 @@ read-only production sender check returned its expected configuration-unavailabl
 result with no provider lookup or message. This is the honest current setup
 boundary, not a successful general-email delivery test. The final documentation
 update changes no application code.
+
+## 11h. Staff account deletion, retained Records and operational reports — 15 October 2026
+
+The administrative changes add permanent doctor/receptionist login deletion
+after deactivation, alongside the existing patient deletion flow. Pending
+deletions cannot be edited or reactivated, and retained account records expose
+contact details to administrators. Inviting a deleted account back creates a
+separate login; historical clinical records remain attached to the original
+identity. Reports use server aggregates for the selected dates, with daily
+appointment trends, outcomes, doctor workload and clinical counts. Current
+active/inactive/deleted account totals are labeled separately from activity
+within the chosen date range; empty datasets remain zero or explicit empty
+states. None of these changes establishes general email delivery readiness.
+
+| Check completed so far | Result and boundary |
+| --- | --- |
+| Full server unit command | **329 total: 323 passed, six intentional database skips, zero failed**, Node22, **84.520s** |
+| Focused staff/patient deletion checks | **25/25 passed** |
+| Focused invitation/Records and report checks | **8/8 passed** |
+| Initial affected PostgreSQL run | **1/2 passed, one failed**: the new notification helper used category `user`, outside the database's allowed `system`/`appointment` categories |
+| Corrected affected PostgreSQL run | **2/2 passed**, no skips, **140.625s** after changing the helper's default category to `system`; the patient case took20.76s |
+| Initial affected browser run | **44/45 passed, one failed**: the test expected `Confirmed`, while the doctor's rendered appointment status was lowercase `confirmed`; the mocked SSE update had reached the doctor view |
+| Final full browser run | **99/99 passed**, zero failures, **2.3 minutes**; includes separate admin/doctor/patient sessions receiving the mocked stream, Records contacts/reinvite, password setup and mobile plot readability |
+| Final complete server suite | **348 total: 342 passed, six intentional database skips, zero failures**, Node22, **85.007s** |
+| Expanded all-role deletion PostgreSQL case | **1/1 passed**, no skips, **35.831s**; patient/doctor/receptionist credentials removed under isolated provider fixtures, actual database histories retained, doctor appointment conflict refused, directory unpublished and deletion notices persisted |
+| Initial/repeat invitation safety and identity checks | **92/92 focused checks passed**, **24.38s**, including atomically rejecting an existing unconfirmed email without overwriting or deleting it |
+| Records route scope and invitation acknowledgement | **20/20 passed**, **1.902s**; a native local HTTP router check confirms that the Records admin guard preserves doctor access to unrelated APIs |
+| Retained contact notices and archive lookup | **39/39 passed**, **2.082s** after adding identifiable deletion messages and account-reference search |
+| Server and frontend TypeScript; frontend build | Passed |
+| Frontend lint | Zero errors; the existing Fast Refresh warning and ESLint ignore-file deprecation remain |
+| Publication scan | **482 indexed files, zero findings** |
+| Actual production SQL report check | Read-only transaction passed:30 daily dates, matching totals/series/doctor workload and nonnegative account counts; no personal rows printed or provider calls |
+| Migrations024/025 | Applied under the migration lock and verified:version ledger, RLS and durable change triggers; invitation state backfilled without changing authentication or clinical rows; no emails sent |
+
+The browser/provider fixtures do not send emails, delete real users or prove a
+live multi-user clinic session. The isolated PostgreSQL cases exercise real
+SQL in temporary schemas. The failed notification category and browser
+assertion are retained here rather than counted as successful original runs.
+The invitation API can reuse an existing unconfirmed identity. Review caught
+that risk before release; new invitations and reinvitations now atomically
+create their own identity first. Existing emails return409, cleanup is limited
+to that fresh UUID, doctor publication follows successful provisioning, and
+the emailed invitation must acknowledge the same identity. Password acceptance
+notices follow a real provider acknowledgement and commit once with their audit
+record. A provider-confirmed invitation racing its provisioning transaction can
+retry briefly without losing the password setup screen.
+
+The Records administrator guard is scoped to `/account-records`; its local HTTP
+regression verifies other role APIs still pass through. Mobile plots scroll
+within their card to preserve readable labels. Background refreshes retain
+unapplied report filters, and stalled stream readers reconnect while polling
+remains available.
+
+Release commit and deployment verification are recorded after publication.
+The verified replacement sender, Supabase
+custom SMTP and live clinical/inbox acceptance remain outstanding; the SPU
+sender plan remains canceled.
 
 ## 12. Supporting documents
 

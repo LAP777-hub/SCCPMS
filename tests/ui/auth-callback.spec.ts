@@ -28,6 +28,7 @@ async function mockCallbackServices(page: Page, { role = 'doctor', verified = fa
     const path = new URL(route.request().url()).pathname;
     apiRequests.push(path);
     if (path === '/auth/profile') return route.fulfill({ json: { data: { id: userId, role, email: account.email, full_name: 'Invited Clinician', phone: '+27123456789' } } });
+    if (path === '/auth/invitation/complete') { updates.push(route.request().postDataJSON()); return route.fulfill({ json: { message: 'Accepted fixture' } }); }
     if (path === '/auth/otp/status') return route.fulfill({ json: { verified } });
     return route.fulfill({ json: { data: [] } });
   });
@@ -268,8 +269,8 @@ test('password creation waits for the trusted account response', async ({ page }
 test('a failed password update keeps invitation setup available after reload', async ({ page }) => {
   await mockCallbackServices(page);
   let failUpdate = true;
-  await page.route('**/auth/v1/user', route => {
-    if (route.request().method() === 'PUT' && failUpdate) return route.fulfill({ status: 422, json: { message: 'Password update temporarily unavailable.' } });
+  await page.route('**/auth/invitation/complete', route => {
+    if (failUpdate) return route.fulfill({ status: 422, json: { error: 'Password update temporarily unavailable.' } });
     return route.fulfill({ json: { ...user, email: 'doctor@spu.ac.za' } });
   });
   await page.goto(`/?auth_action=invite#${callbackFragment()}`, { waitUntil: 'domcontentloaded' });

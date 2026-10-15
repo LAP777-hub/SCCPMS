@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { notifyClinicActivity } from './clinic-notifications.js';
 import { z } from 'zod';
 import { allowRoles, requireAuth, requireOtp } from './auth.js';
 import { pool } from './db.js';
@@ -495,6 +496,7 @@ router.post('/appointments/:id/reschedule', async (req, res) => {
         `Appointment moved to ${new Date(slot.starts_at).toISOString()} with ${slot.doctor_name}; awaiting confirmation.`,
       ]
     );
+    await notifyClinicActivity(client, { title: 'Appointment rescheduled', category: 'appointment', message: `An appointment was moved to ${new Date(slot.starts_at).toISOString()} with ${slot.doctor_name}; awaiting confirmation.` });
     await client.query('COMMIT');
     return res.json({ data: { ...updated.rows[0], doctor_name: slot.doctor_name } });
   } catch (error) {

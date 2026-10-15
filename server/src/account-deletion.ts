@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Pool, PoolClient } from 'pg';
+import { notifyClinicActivity } from './clinic-notifications.js';
 
 const patientRoles = ['patient', 'student', 'lecturer', 'staff'];
 type AccountState = {
@@ -24,16 +25,18 @@ export async function deletePatientLoginAccount(
   database: Pool,
   provider: SupabaseClient,
   userId: string,
-  actorUserId: string
+  actorUserId: string,
+  family: 'patient' | 'staff' = 'patient'
 ) {
+  const roles = family === 'staff' ? ['doctor', 'receptionist'] : patientRoles;
   if (userId === actorUserId) {
     throw new PatientDeletionError(422, 'You cannot delete your own account.');
   }
 
   const { data: profile, error: profileError } = await provider
-    .from('profiles').select('id,role').eq('id', userId).maybeSingle();
+    .from('profiles').select('id,role,full_name').eq('id', userId).maybeSingle();
   if (profileError) throw new PatientDeletionError(503, 'Unable to verify this patient account.');
-  if (!profile || !patientRoles.includes(profile.role)) {
+  if (!profile || !roles.includes(profile.role)) {
     throw new PatientDeletionError(404, 'Patient account not found.');
   }
 
@@ -63,17 +66,21 @@ export async function deletePatientLoginAccount(
       if (error || !data.user) {
         throw new PatientDeletionError(503, 'Unable to verify this patient login account.');
       }
-      if (!patientRoles.includes(data.user.app_metadata.clinic_role ?? profile.role)) {
+      if (!roles.includes(data.user.app_metadata.clinic_role ?? profile.role)) {
         throw new PatientDeletionError(404, 'Patient account not found.');
       }
+      if (family === 'staff' && data.user.app_metadata.clinic_role !== profile.role) throw new PatientDeletionError(409, 'Account role is inconsistent. Correct the staff role before deleting it.');
 
       const appointments = await client.query(
-        `SELECT 1 FROM appointments WHERE patient_user_id=$1 AND
+        family === 'staff' ? `SELECT 1 FROM appointments a JOIN clinic_doctors d ON d.id=a.doctor_id WHERE d.user_id=$1 AND
+         (a.status='in_progress' OR (a.status IN ('pending','confirmed') AND a.ends_at>now())) LIMIT 1`
+          : `SELECT 1 FROM appointments WHERE patient_user_id=$1 AND
          (status='in_progress' OR (status IN ('pending','confirmed') AND ends_at>now())) LIMIT 1`,
         [userId]
       );
       const walkIns = await client.query(
-        `SELECT 1 FROM walk_ins WHERE patient_user_id=$1 AND status NOT IN ('completed','cancelled') LIMIT 1`,
+        family === 'staff' ? `SELECT 1 FROM walk_ins w JOIN clinic_doctors d ON d.id=w.assigned_doctor_id WHERE d.user_id=$1 AND w.status NOT IN ('completed','cancelled') LIMIT 1`
+          : `SELECT 1 FROM walk_ins WHERE patient_user_id=$1 AND status NOT IN ('completed','cancelled') LIMIT 1`,
         [userId]
       );
       if (appointments.rowCount || walkIns.rowCount) {
@@ -87,7 +94,7 @@ export async function deletePatientLoginAccount(
       );
       await client.query(
         `INSERT INTO audit_events (actor_user_id,action,entity_type,entity_id)
-         VALUES ($1,'patient.deletion_requested','profile',$2)`,
+         VALUES ($1,'${family === 'staff' ? profile.role : 'patient'}.deletion_requested','profile',$2)`,
         [actorUserId, userId]
       );
       await client.query('DELETE FROM otp_verified_sessions WHERE user_id=$1', [userId]);
@@ -144,9 +151,11 @@ export async function deletePatientLoginAccount(
     );
     await finalClient.query(
       `INSERT INTO audit_events (actor_user_id,action,entity_type,entity_id)
-       VALUES ($1,'patient.deleted','profile',$2)`,
+       VALUES ($1,'${family === 'staff' ? profile.role : 'patient'}.deleted','profile',$2)`,
       [actorUserId, userId]
     );
+    if (family === 'staff') await finalClient.query('UPDATE clinic_doctors SET active=false,updated_at=now() WHERE user_id=$1', [userId]);
+    await notifyClinicActivity(finalClient, { targetUserId: userId, title: 'Account deleted', message: `${profile.full_name || `Account ${userId}`} (${family === 'staff' ? profile.role : 'patient'}) had their deactivated login deleted. Contact details and clinic history are retained in Records.` });
     await finalClient.query('COMMIT');
     return { id: userId, active: false, deleted_at: deleted.rows[0].deleted_at };
   } catch {

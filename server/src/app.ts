@@ -1,4 +1,5 @@
 import express from 'express';
+import accountRecordsRouter from './account-records.routes.js';
 import cors from 'cors';
 import * as helmetPackage from 'helmet';
 import { rateLimit } from 'express-rate-limit';
@@ -92,6 +93,7 @@ app.use(requestId);
 app.use(auditAccess);
 app.use('/auth/otp', requireAuth, rateLimit({ store: sharedRateLimitStore('otp'), windowMs: 15 * 60 * 1000, limit: 20, keyGenerator:req=>req.auth!.userId, standardHeaders: true, legacyHeaders: false, skip: (req) => req.method === 'GET', message: { error: 'Too many verification requests. Retry later.' } }));
 app.use('/auth/register', rateLimit({ store: sharedRateLimitStore('registration'), windowMs: 60 * 60 * 1000, limit: 250, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many registrations. Retry later.' } }));
+app.use('/auth/invitation/complete', requireAuth, rateLimit({ store: sharedRateLimitStore('invitation-acceptance'), windowMs: 15*60*1000, limit: 10, keyGenerator: req => req.auth!.userId, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many password setup attempts. Retry later.' } }));
 app.use(express.json({ limit: '256kb' }));
 app.use(express.urlencoded({ extended: true, limit: '256kb' }));
 
@@ -166,6 +168,8 @@ app.use('/api/events', eventsRouter);
 app.use('/api', requireAuth, requireOtp, generalLimiter);
 app.use('/api/patients', strictLimiter);
 app.use('/api/staff', strictLimiter);
+app.use('/api/account-records', strictLimiter);
+app.use('/api', accountRecordsRouter);
 app.use('/api', analyticsRouter);
 app.use('/api', apiRouter);
 app.use('/api', schedulingRouter);

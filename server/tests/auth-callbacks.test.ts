@@ -25,11 +25,19 @@ async function call(router: Router, path: string, body: unknown) {
   return result;
 }
 
-function mockProvider() {
+function mockProvider(options: { existingEmail?: boolean; invitedId?: string; failAudit?: boolean; failProfile?: boolean } = {}) {
   const requests: Array<{ url: URL; method: string; body: any }> = [];
   const statements: Array<{ sql: string; parameters: unknown[] }> = [];
+  const events: string[] = [];
   mock.method(pool, 'query', async (sql: string, parameters: unknown[]) => {
     statements.push({ sql, parameters });
+    if (sql.includes('INSERT INTO clinic_doctors')) events.push('doctor-unpublished');
+    if (sql.includes('INSERT INTO account_invitations')) events.push('tracking');
+    if (sql.includes('INSERT INTO audit_events')) {
+      if (options.failAudit) throw new Error('Private audit fixture failure');
+      events.push('audit');
+    }
+    if (sql.includes('UPDATE clinic_doctors SET active=true')) events.push('publish');
     return { rowCount: 1, rows: [] };
   });
   mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -37,16 +45,30 @@ function mockProvider() {
     const method = init?.method || 'GET';
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     requests.push({ url, method, body });
-    if (url.pathname.endsWith('/auth/v1/signup') || url.pathname.endsWith('/auth/v1/invite')) {
-      return Response.json({ user: { id: userId, email: body.email, identities: [{ id: 'callback-fixture-identity', provider: 'email' }] } });
+    if (url.pathname.endsWith('/auth/v1/admin/users') && method === 'POST') {
+      events.push('create');
+      if (options.existingEmail) return Response.json({ code: 'email_exists', message: 'Email belongs to an unconfirmed fixture account' }, { status: 422, headers: { 'X-Supabase-Api-Version': '2024-01-01' } });
+      return Response.json({ id: userId, email: body.email, app_metadata: body.app_metadata });
     }
-    if (url.pathname.endsWith('/rest/v1/profiles') && ['POST', 'PATCH'].includes(method)) return new Response(null, { status: 204 });
+    if (url.pathname.endsWith('/auth/v1/signup') || url.pathname.endsWith('/auth/v1/invite')) {
+      events.push(url.pathname.endsWith('/invite') ? 'invite' : 'signup');
+      return Response.json({ user: { id: options.invitedId ?? userId, email: body.email, identities: [{ id: 'callback-fixture-identity', provider: 'email' }] } });
+    }
+    if (url.pathname.endsWith('/rest/v1/profiles') && ['POST', 'PATCH'].includes(method)) {
+      events.push('profile');
+      if (options.failProfile) return Response.json({ message: 'Private profile fixture failure' }, { status: 503 });
+      return new Response(null, { status: 204 });
+    }
     if (url.pathname.endsWith(`/auth/v1/admin/users/${userId}`) && method === 'PUT') {
       return Response.json({ user: { id: userId, app_metadata: body.app_metadata } });
     }
+    if (url.pathname.endsWith(`/auth/v1/admin/users/${userId}`) && method === 'DELETE') {
+      events.push('delete-owned');
+      return Response.json({ id: userId });
+    }
     throw new Error('External request blocked by auth callback fixture');
   });
-  return { requests, statements };
+  return { requests, statements, events };
 }
 
 test('auth callbacks distinguish signup, invitation and recovery at the configured frontend origin', () => {
@@ -87,9 +109,17 @@ for (const role of ['doctor', 'receptionist'] as const) {
     assert.equal(request.url.searchParams.get('redirect_to'), `${config.FRONTEND_ORIGIN}/?auth_action=invite`);
     assert.equal(request.body.email, `${role}@spu.ac.za`);
     for (const providerRequest of provider.requests) assert.equal(Object.prototype.hasOwnProperty.call(providerRequest.body ?? {}, 'password'), false);
-    const claims = provider.requests.find(request => request.url.pathname.endsWith(`/auth/v1/admin/users/${userId}`));
+    const claims = provider.requests.find(request => request.url.pathname.endsWith('/auth/v1/admin/users') && request.method === 'POST');
     assert.equal(claims?.body.app_metadata.clinic_role, role);
+    assert.equal(claims?.body.email_confirm, false);
+    assert.ok(provider.events.indexOf('create') < provider.events.indexOf('profile'));
+    assert.ok(provider.events.indexOf('profile') < provider.events.indexOf('invite'));
+    assert.ok(provider.events.indexOf('invite') < provider.events.indexOf('tracking'));
     assert.equal(provider.statements.some(statement => statement.sql.includes('INSERT INTO clinic_doctors')), role === 'doctor');
+    if (role === 'doctor') {
+      assert.match(provider.statements.find(statement => statement.sql.includes('INSERT INTO clinic_doctors'))!.sql, /VALUES\s*\(\$1,\s*\$2,\s*\$3,\s*\$4,\s*false\)/);
+      for (const step of ['doctor-unpublished', 'invite', 'tracking', 'audit']) assert.ok(provider.events.indexOf(step) < provider.events.indexOf('publish'), step);
+    }
   });
 }
 
@@ -105,6 +135,61 @@ test('admin-created patient invitations use the same password setup callback', a
   assert.equal(request.url.searchParams.get('redirect_to'), `${config.FRONTEND_ORIGIN}/?auth_action=invite`);
   assert.equal(request.body.email, 'invited123@spu.ac.za');
   assert.equal('password' in request.body, false);
+  const created = provider.requests.find(request => request.url.pathname.endsWith('/auth/v1/admin/users') && request.method === 'POST')!;
+  assert.equal(created.body.email_confirm, false);
+  assert.equal(created.body.app_metadata.clinic_role, 'patient');
+  assert.ok(provider.events.indexOf('create') < provider.events.indexOf('profile'));
+  assert.ok(provider.events.indexOf('profile') < provider.events.indexOf('invite'));
+  assert.ok(provider.events.indexOf('invite') < provider.events.indexOf('tracking'));
+});
+
+const invitationCases = [
+  { role: 'doctor', path: '/staff', body: { email: 'doctor@spu.ac.za', role: 'doctor', fullName: 'Doctor Invitation Fixture', phone: '+27123456789', specialty: 'Family Medicine' } },
+  { role: 'receptionist', path: '/staff', body: { email: 'receptionist@spu.ac.za', role: 'receptionist', fullName: 'Receptionist Invitation Fixture', phone: '+27123456789' } },
+  { role: 'patient', path: '/patients', body: { email: 'invited123@spu.ac.za', fullName: 'Patient Invitation Fixture', phone: '+27123456789', userType: 'Student', studentNumber: 'INVITED123' } },
+];
+
+for (const invitation of invitationCases) {
+  test(`${invitation.role} invitation rejects an existing unconfirmed email without overwriting or deleting it`, async () => {
+    const provider = mockProvider({ existingEmail: true });
+    const result = await call(api, invitation.path, invitation.body);
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'ACCOUNT_EMAIL_IN_USE');
+    assert.equal(provider.requests.length, 1, 'only atomic CREATE may be attempted');
+    assert.equal(provider.requests[0].method, 'POST');
+    assert.equal(provider.requests[0].url.pathname.endsWith('/auth/v1/admin/users'), true);
+    assert.equal(provider.statements.length, 0);
+  });
+
+  test(`${invitation.role} invitation requires its owned UUID acknowledgement and cleans up only the newly created identity`, async () => {
+    const provider = mockProvider({ invitedId: adminId });
+    const result = await call(api, invitation.path, invitation.body);
+    assert.equal(result.status, 503);
+    const deleted = provider.requests.filter(request => request.method === 'DELETE');
+    assert.deepEqual(deleted.map(request => request.url.pathname.split('/').at(-1)), [userId]);
+    assert.equal(provider.requests.some(request => request.method === 'PUT'), false);
+    assert.equal(provider.events.includes('tracking'), false);
+    assert.equal(provider.events.includes('publish'), false);
+  });
+}
+
+test('a doctor stays unpublished when invitation tracking or audit cannot finish', async () => {
+  const provider = mockProvider({ failAudit: true });
+  const result = await call(api, '/staff', invitationCases[0].body);
+  assert.equal(result.status, 503);
+  assert.ok(provider.events.includes('doctor-unpublished'));
+  assert.ok(provider.events.includes('invite'));
+  assert.ok(provider.events.includes('tracking'));
+  assert.equal(provider.events.includes('publish'), false);
+  assert.deepEqual(provider.requests.filter(request => request.method === 'DELETE').map(request => request.url.pathname.split('/').at(-1)), [userId]);
+  assert.ok(provider.statements.some(statement => statement.sql.startsWith('DELETE FROM clinic_doctors') && statement.parameters[0] === userId));
+});
+
+test('failed patient provisioning deletes only the fresh account before sending an invitation', async () => {
+  const provider = mockProvider({ failProfile: true });
+  assert.equal((await call(api, '/patients', invitationCases[2].body)).status, 503);
+  assert.equal(provider.events.includes('invite'), false);
+  assert.deepEqual(provider.requests.filter(request => request.method === 'DELETE').map(request => request.url.pathname.split('/').at(-1)), [userId]);
 });
 
 test('administrators cannot supply a password while inviting staff', async () => {

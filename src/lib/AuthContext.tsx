@@ -638,10 +638,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: 'Your account setup session has changed or expired. Open the latest account email link again.' };
     }
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) return { error: error.message };
+      if (intent.kind === 'invite') {
+        await apiRequest('/auth/invitation/complete', { method: 'POST', body: JSON.stringify({ password }), signal: AbortSignal.timeout(12000) });
+      } else {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) return { error: error.message };
+      }
       if (!sameAuthSession(expected, currentSession.current)) return { error: 'Your session changed. Sign in again with the password for your account.' };
-    } catch { return { error: 'Unable to update your password. Check your connection and try again.' }; }
+    } catch (error) { return { error: error instanceof ApiError ? error.message : error instanceof Error && ['AbortError','TimeoutError'].includes(error.name) ? AUTH_TIMEOUT_MESSAGE : 'Unable to update your password. Check your connection and try again.' }; }
     storePasswordSetup(null);
     setup.current = null;
     recoveryMode.current = false;

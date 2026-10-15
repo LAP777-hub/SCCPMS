@@ -6,6 +6,7 @@ import { previousLabStatuses } from './workflow-policy.js';
 import { createClient } from '@supabase/supabase-js';
 import { config } from './config.js';
 import { schedulingConflict } from './workflow-policy.js';
+import { operationsReport, ReportRangeError } from './operations-report.js';
 
 const router = Router();
 const supabaseAdmin = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
@@ -1022,29 +1023,9 @@ router.get('/reports/summary', allowRoles('admin'), async (req, res) => {
       .status(422)
       .json({ error: 'The report end date must be on or after the start date.' });
   try {
-    const result = await pool.query(
-      `WITH bounds AS (
-         SELECT timezone,COALESCE($1::date,(now() AT TIME ZONE timezone)::date-30) AS from_date,
-           COALESCE($2::date,(now() AT TIME ZONE timezone)::date) AS to_date FROM clinic_settings WHERE id=true
-       ), selected AS (
-         SELECT a.* FROM appointments a,bounds b
-         WHERE (a.starts_at AT TIME ZONE b.timezone)::date BETWEEN b.from_date AND b.to_date
-       ) SELECT count(*)::int AS appointments,
-         count(*) FILTER (WHERE status='completed')::int AS completed,
-         count(*) FILTER (WHERE status='cancelled')::int AS cancelled,
-         count(*) FILTER (WHERE status='no_show')::int AS no_show,
-         count(*) FILTER (WHERE status='pending')::int AS pending,
-         count(*) FILTER (WHERE status='confirmed')::int AS confirmed,
-         count(*) FILTER (WHERE status='in_progress')::int AS in_progress,
-         count(DISTINCT patient_user_id) FILTER (WHERE status='completed')::int AS patients_seen,
-         (SELECT count(*)::int FROM clinic_doctors WHERE active=true) AS active_doctors,
-         (SELECT count(*)::int FROM doctor_leave_requests WHERE status='pending') AS pending_leave,
-         (SELECT count(*)::int FROM walk_ins w,bounds b WHERE (w.arrived_at AT TIME ZONE b.timezone)::date BETWEEN b.from_date AND b.to_date) AS walk_ins
-       FROM selected`,
-      [query.data.from ?? null, query.data.to ?? null]
-    );
-    return res.json({ data: result.rows[0] });
-  } catch {
+    return res.json({ data: await operationsReport(pool, query.data) });
+  } catch (error) {
+    if (error instanceof ReportRangeError) return res.status(422).json({ error: error.message });
     return res.status(503).json({ error: 'Unable to generate operations report.' });
   }
 });

@@ -10,6 +10,7 @@ import { refinePatientIdentity, accountEmailSchema } from './university-policy.j
 import { phoneSchema } from './phone.js';
 import { authCallbackUrl } from './auth-callback.js';
 import { deletePatientLoginAccount, PatientDeletionError } from './account-deletion.js';
+import { notifyClinicActivity } from './clinic-notifications.js';
 
 const router = Router();
 const supabaseAdmin = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
@@ -107,23 +108,27 @@ router.post('/patients', allowRoles('admin', 'receptionist'), async (req, res) =
       .json({ error: 'Invalid patient account details.', details: parsed.error.flatten() });
   const { email, fullName, phone, userType, studentNumber, staffNumber, department, program } =
     parsed.data;
-  const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-    email,
-    {
-      data: { full_name: fullName, phone, user_type: userType },
-      redirectTo: authCallbackUrl('invite'),
-    }
-  );
-  if (inviteError || !invited.user) {
-    return res
-      .status(422)
-      .json({ error: inviteError?.message ?? 'Unable to send the account invitation.' });
-  }
-
+  let createdId: string | undefined;
   try {
+    // Inviting alone can reuse an unconfirmed account. Only an atomic CREATE
+    // establishes that this request owns the identity it may provision/delete.
+    const created = await supabaseAdmin.auth.admin.createUser({
+      email, email_confirm: false,
+      app_metadata: { clinic_role: 'patient', clinic_phone: phone },
+      user_metadata: { full_name: fullName, phone, user_type: userType },
+    });
+    if (created.error) {
+      if (['email_exists', 'user_already_exists'].includes(created.error.code ?? '')) {
+        return res.status(409).json({ error: 'This email already has an account. Manage that account in its directory.', code: 'ACCOUNT_EMAIL_IN_USE' });
+      }
+      return res.status(503).json({ error: 'Unable to create the patient account. Check the account service and try again.' });
+    }
+    const newId = z.string().uuid().safeParse(created.data.user?.id);
+    if (!newId.success || newId.data === req.auth!.userId) throw new Error('Unexpected created patient identity');
+    createdId = newId.data;
     const { error: profileError } = await supabaseAdmin.from('profiles').upsert(
       {
-        id: invited.user.id,
+        id: createdId,
         role: 'patient',
         email,
         full_name: fullName,
@@ -137,20 +142,23 @@ router.post('/patients', allowRoles('admin', 'receptionist'), async (req, res) =
       { onConflict: 'id' }
     );
     if (profileError) throw profileError;
-    const { error: accountError } = await supabaseAdmin.auth.admin.updateUserById(invited.user.id, {
-      app_metadata: { clinic_role: 'patient', clinic_phone: phone },
+    const invited = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName, phone, user_type: userType },
+      redirectTo: authCallbackUrl('invite'),
     });
-    if (accountError) throw accountError;
+    if (invited.error || invited.data.user?.id !== createdId) throw new Error('Patient invitation identity was not acknowledged');
+    await pool.query('INSERT INTO account_invitations(user_id,invited_by,role) VALUES($1,$2,$3) ON CONFLICT(user_id) DO NOTHING', [createdId,req.auth!.userId,'patient']);
     await pool.query(
       `INSERT INTO audit_events (actor_user_id, action, entity_type, entity_id)
        VALUES ($1, 'patient.invited', 'profile', $2)`,
-      [req.auth!.userId, invited.user.id]
+      [req.auth!.userId, createdId]
     );
+    if (res.headersSent || res.writableEnded || res.destroyed) return res;
     return res
       .status(201)
-      .json({ data: { id: invited.user.id, email, fullName, invitationSent: true } });
+      .json({ data: { id: createdId, email, fullName, invitationSent: true } });
   } catch {
-    await supabaseAdmin.auth.admin.deleteUser(invited.user.id);
+    if (createdId) await supabaseAdmin.auth.admin.deleteUser(createdId).catch(() => undefined);
     return res.status(503).json({ error: 'The patient account could not be fully created.' });
   }
 });
@@ -321,23 +329,25 @@ router.post('/staff', allowRoles('admin'), async (req, res) => {
   }
 
   const { email, role, fullName, phone, department, specialty } = parsed.data;
-  const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-    email,
-    {
-      data: { full_name: fullName, phone },
-      redirectTo: authCallbackUrl('invite'),
-    }
-  );
-  if (inviteError || !invited.user) {
-    return res
-      .status(422)
-      .json({ error: inviteError?.message ?? 'Unable to send the staff invitation.' });
-  }
-
+  let createdId: string | undefined;
   try {
+    const created = await supabaseAdmin.auth.admin.createUser({
+      email, email_confirm: false,
+      app_metadata: { clinic_role: role, clinic_phone: phone },
+      user_metadata: { full_name: fullName, phone },
+    });
+    if (created.error) {
+      if (['email_exists', 'user_already_exists'].includes(created.error.code ?? '')) {
+        return res.status(409).json({ error: 'This email already has an account. Manage that account in its directory.', code: 'ACCOUNT_EMAIL_IN_USE' });
+      }
+      return res.status(503).json({ error: 'Unable to create the staff account. Check the account service and try again.' });
+    }
+    const newId = z.string().uuid().safeParse(created.data.user?.id);
+    if (!newId.success || newId.data === req.auth!.userId) throw new Error('Unexpected created staff identity');
+    createdId = newId.data;
     const { error: profileError } = await supabaseAdmin.from('profiles').upsert(
       {
-        id: invited.user.id,
+        id: createdId,
         role,
         email,
         full_name: fullName,
@@ -350,35 +360,41 @@ router.post('/staff', allowRoles('admin'), async (req, res) => {
     );
     if (profileError) throw profileError;
 
-    const { error: accountError } = await supabaseAdmin.auth.admin.updateUserById(invited.user.id, {
-      app_metadata: { clinic_role: role, clinic_phone: phone },
-    });
-    if (accountError) throw accountError;
-
     if (role === 'doctor') {
       await pool.query(
         `INSERT INTO clinic_doctors (user_id, full_name, specialty, department, active)
-         VALUES ($1, $2, $3, $4, true)`,
-        [invited.user.id, fullName, specialty, department ?? null]
+         VALUES ($1, $2, $3, $4, false)`,
+        [createdId, fullName, specialty, department ?? null]
       );
     }
 
+    const invited = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName, phone },
+      redirectTo: authCallbackUrl('invite'),
+    });
+    if (invited.error || invited.data.user?.id !== createdId) throw new Error('Staff invitation identity was not acknowledged');
+    await pool.query('INSERT INTO account_invitations(user_id,invited_by,role) VALUES($1,$2,$3) ON CONFLICT(user_id) DO NOTHING', [createdId,req.auth!.userId,role]);
     await pool.query(
       `INSERT INTO audit_events (actor_user_id, action, entity_type, entity_id)
        VALUES ($1, $2, 'profile', $3)`,
-      [req.auth!.userId, `${role}.invited`, invited.user.id]
+      [req.auth!.userId, `${role}.invited`, createdId]
     );
+    if (role === 'doctor') {
+      const published = await pool.query('UPDATE clinic_doctors SET active=true,updated_at=now() WHERE user_id=$1', [createdId]);
+      if (published.rowCount !== 1) throw new Error('Doctor publication did not complete');
+    }
+    if (res.headersSent || res.writableEnded || res.destroyed) return res;
     return res
       .status(201)
-      .json({ data: { id: invited.user.id, email, role, fullName, invitationSent: true } });
+      .json({ data: { id: createdId, email, role, fullName, invitationSent: true } });
   } catch {
-    await pool
-      .query('DELETE FROM clinic_doctors WHERE user_id = $1', [invited.user.id])
-      .catch(() => undefined);
-    await supabaseAdmin.auth.admin.deleteUser(invited.user.id);
+    if (createdId) {
+      await pool.query('DELETE FROM clinic_doctors WHERE user_id = $1', [createdId]).catch(() => undefined);
+      await supabaseAdmin.auth.admin.deleteUser(createdId).catch(() => undefined);
+    }
     return res
       .status(503)
-      .json({ error: 'The account could not be fully provisioned. No partial account was kept.' });
+      .json({ error: 'The account could not be fully provisioned. Retry or contact the administrator.' });
   }
 });
 
@@ -653,6 +669,7 @@ router.patch('/appointments/:id/status', async (req, res) => {
           ]
         );
       }
+      await notifyClinicActivity(client, { title: 'Appointment updated', category: 'appointment', message: `Appointment with ${doctor.rows[0]?.full_name ?? 'the clinic'} is now ${nextStatus.replaceAll('_', ' ')}.` });
       await client.query(
         `INSERT INTO audit_events (actor_user_id, action, entity_type, entity_id)
        VALUES ($1, $2, 'appointment', $3)`,
@@ -783,7 +800,7 @@ async function updateAccount(
     const account = await client.query('SELECT active,deletion_requested_at,deleted_at FROM account_status WHERE user_id=$1 FOR UPDATE', [id.data]);
     if (account.rows[0]?.deletion_requested_at || account.rows[0]?.deleted_at) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'This patient account is being deleted or has been deleted and cannot be changed or reactivated.' });
+      return res.status(409).json({ error: 'This account is being deleted or has been deleted and cannot be changed or reactivated.' });
     }
     if (body.data.active === false) {
       const conflict = await client.query(
@@ -860,7 +877,12 @@ async function updateAccount(
         id.data,
       ]
     );
+    if (body.data.active !== undefined && account.rows[0]?.active !== body.data.active) await notifyClinicActivity(client, {
+      targetUserId: id.data, title: body.data.active ? 'Account activated' : 'Account deactivated',
+      message: `${profile.full_name || profile.email}'s ${targetRole} account was ${body.data.active ? 'activated' : 'deactivated'} by an administrator.`,
+    });
     await client.query('COMMIT');
+    if (res.headersSent || res.writableEnded || res.destroyed) return res;
     return res.json({
       data: {
         id: id.data,
@@ -916,9 +938,18 @@ async function updateAccount(
 router.patch('/staff/:id', allowRoles('admin'), (req, res) =>
   updateAccount(req, res, 'staff', false)
 );
-router.delete('/staff/:id', allowRoles('admin'), (req, res) =>
-  updateAccount(req, res, 'staff', true)
-);
+router.delete('/staff/:id', allowRoles('admin'), async (req, res) => {
+  if (req.auth!.role !== 'admin') return res.status(403).json({ error: 'Only administrators can delete staff accounts.' });
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) return res.status(400).json({ error: 'Invalid staff account id.' });
+  try {
+    const data = await deletePatientLoginAccount(pool, supabaseAdmin, id.data, req.auth!.userId, 'staff');
+    return res.json({ data });
+  } catch (error) {
+    if (error instanceof PatientDeletionError) return res.status(error.status).json({ error: error.message.replace(/patient/gi, 'staff'), code: error.code === 'PATIENT_DELETION_PENDING' ? 'STAFF_DELETION_PENDING' : error.code });
+    return res.status(503).json({ error: 'Unable to delete this staff login. It remains disabled; retry deletion.' });
+  }
+});
 router.patch('/patients/:id', allowRoles('admin', 'receptionist'), (req, res) =>
   updateAccount(req, res, 'patient', false)
 );

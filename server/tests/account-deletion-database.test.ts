@@ -18,6 +18,7 @@ test('patient deletion preserves database history, safely retries and frees the 
   const providerDeletes: { id: string; soft: boolean }[] = [];
   let providerUnavailable = true;
   let providerDeleted = false;
+  const removedIdentities = new Set<string>();
   const provider = {
     from(table: string) {
       assert.equal(table, 'profiles');
@@ -30,12 +31,13 @@ test('patient deletion preserves database history, safely retries and frees the 
       return request;
     },
     auth: { admin: {
-      async getUserById(id: string) { return { data: { user: { id, app_metadata: { clinic_role: 'patient' } } }, error: null }; },
+      async getUserById(id: string) { const role=(await database.query('SELECT role FROM profiles WHERE id=$1',[id])).rows[0]?.role; return { data: { user: { id, app_metadata: { clinic_role: role } } }, error: null }; },
       async deleteUser(id: string, soft: boolean) {
         providerDeletes.push({ id, soft });
         if (providerUnavailable) return { error: { status: 503, code: 'unexpected_failure' } };
-        if (providerDeleted) return { error: { status: 404, code: 'user_not_found' } };
-        providerDeleted = true;
+        if (removedIdentities.has(id)) return { error: { status: 404, code: 'user_not_found' } };
+        removedIdentities.add(id);
+        if(id===patientId) providerDeleted = true;
         return { error: null };
       },
     } },
@@ -48,8 +50,9 @@ test('patient deletion preserves database history, safely retries and frees the 
     await database.query(await readFile(new URL('../sql/005_account_status.sql', import.meta.url), 'utf8'));
     await database.query(await readFile(new URL('../sql/002_notifications_audit.sql', import.meta.url), 'utf8'));
     await database.query(`
-      CREATE TABLE appointments (id uuid PRIMARY KEY,patient_user_id uuid NOT NULL,status text NOT NULL,ends_at timestamptz NOT NULL);
-      CREATE TABLE walk_ins (id uuid PRIMARY KEY,patient_user_id uuid NOT NULL,status text NOT NULL);
+      CREATE TABLE appointments (id uuid PRIMARY KEY,patient_user_id uuid NOT NULL,status text NOT NULL,ends_at timestamptz NOT NULL,doctor_id uuid);
+      CREATE TABLE walk_ins (id uuid PRIMARY KEY,patient_user_id uuid NOT NULL,status text NOT NULL,assigned_doctor_id uuid);
+      CREATE TABLE clinic_doctors (id uuid PRIMARY KEY,user_id uuid UNIQUE,active boolean NOT NULL DEFAULT true,updated_at timestamptz DEFAULT now());
       CREATE TABLE patient_visits (id uuid PRIMARY KEY,patient_user_id uuid NOT NULL,assessment text NOT NULL);
       CREATE TABLE prescriptions (id uuid PRIMARY KEY,patient_user_id uuid NOT NULL,medication text NOT NULL);
       CREATE TABLE lab_orders (id uuid PRIMARY KEY,patient_user_id uuid NOT NULL,result_summary text NOT NULL);
@@ -111,6 +114,26 @@ test('patient deletion preserves database history, safely retries and frees the 
     ]);
     await database.query(migration);
     assert.deepEqual((await database.query('SELECT email,deleted_email,full_name FROM profiles WHERE id=$1', [patientId])).rows[0], retained);
+    for(const role of ['doctor','receptionist']) {
+      const staffId=randomUUID(),directoryId=randomUUID(),appointmentId=randomUUID();
+      await database.query('INSERT INTO profiles(id,email,role,full_name) VALUES($1,$2,$3,$4)',[staffId,`${role}-fixture@example.invalid`,role,`Retained ${role}`]);
+      await database.query('INSERT INTO account_status(user_id,active) VALUES($1,false)',[staffId]);
+      if(role==='doctor') {
+        await database.query('INSERT INTO clinic_doctors(id,user_id) VALUES($1,$2)',[directoryId,staffId]);
+        await database.query("INSERT INTO appointments(id,patient_user_id,status,ends_at,doctor_id) VALUES($1,$2,'confirmed',now()+interval '1 day',$3)",[appointmentId,patientId,directoryId]);
+        await assert.rejects(deletePatientLoginAccount(database,provider,staffId,actorId,'staff'),(error:unknown)=>error instanceof PatientDeletionError&&error.status===409);
+        assert.equal(removedIdentities.has(staffId),false);
+        await database.query("UPDATE appointments SET status='cancelled' WHERE id=$1",[appointmentId]);
+      }
+      const deleted=await deletePatientLoginAccount(database,provider,staffId,actorId,'staff');
+      assert.ok(deleted.deleted_at);assert.equal(removedIdentities.has(staffId),true);
+      assert.equal((await database.query('SELECT deleted_email FROM profiles WHERE id=$1',[staffId])).rows[0].deleted_email,`${role}-fixture@example.invalid`);
+      assert.equal((await database.query("SELECT count(*)::int AS count FROM notifications WHERE user_id=$1 AND title='Account deleted'",[staffId])).rows[0].count,1);
+      if(role==='doctor') {
+        assert.equal((await database.query('SELECT active FROM clinic_doctors WHERE user_id=$1',[staffId])).rows[0].active,false);
+        assert.equal((await database.query('SELECT doctor_id FROM appointments WHERE id=$1',[appointmentId])).rows[0].doctor_id,directoryId);
+      }
+    }
   } finally {
     await database.end();
     assert.match(schema, /^clinic_account_deletion_test_[a-f0-9]{32}$/);

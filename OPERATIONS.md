@@ -111,8 +111,16 @@ sending messages or creating accounts.
   In hosted Supabase Auth settings, leave session inactivity timeout and maximum
   lifetime disabled for this manual-logout policy. Account deactivation, email
   changes and revoked authentication still block access.
-- Removing an account deactivates access while retaining clinical/audit history.
-  Active care must be completed, cancelled, rescheduled or reassigned first.
+- An admin must deactivate a patient, doctor or receptionist before deleting its
+  login account. Active care must be completed, cancelled, rescheduled or
+  reassigned first. A pending deletion stays disabled until a retry finishes;
+  it cannot be reactivated while deletion is pending.
+- Deleted accounts remain in admin Records with contact details. Reinvite
+  creates a separate Auth UUID and retains the historical records on the former
+  identity. It does not grant the replacement login access to that history.
+  `409 ACCOUNT_EMAIL_IN_USE` means the retained email already has an account;
+  manage that account instead. Reinvitation never overwrites that account's
+  profile or trusted role.
 
 Appointments and availability obey the clinic timezone, hours, holidays and
 approved leave. Database constraints prevent overlapping appointments. Front desk
@@ -122,10 +130,14 @@ notes, vitals, prescriptions and laboratory orders/results. Patients read their
 own released records; admin/receptionist cannot access clinician SOAP content.
 Clinical corrections preserve prior values for the responsible doctor.
 
-Notifications are persisted and trigger authorized dashboard refresh through
-PostgreSQL notifications, with reconnection and polling fallback. Analytics use
-real activity and show zero when the clinic has none. API/operation audit logs
-are retained independently of list limits.
+Notifications are persisted for account activation, deactivation, deletion and
+invitation acceptance after the invitee's password update is acknowledged.
+They trigger authorized dashboard refresh through PostgreSQL notifications on
+persistent hosting or a durable change-log check every two seconds on Vercel.
+The browser also refreshes reads every 15 seconds when needed. These in-app
+notices do not configure or prove email delivery. Analytics use real activity
+and show zero when the clinic has none; admin charts accept date ranges of up
+to 366 days. API/operation audit logs are retained independently of list limits.
 
 ## Deployment
 
@@ -136,6 +148,12 @@ uses Photon/OSM; [provider configuration](docs/residential-address-search.md)
 describes the cache, quotas and dedicated endpoint needed for sustained traffic.
 Apply migration017 for the optional profile coordinates. Manual residential
 addresses remain available whenever the map service is unavailable.
+
+Apply `024_account_records_invitations.sql` before deploying deleted-account
+Records, reinvitation and tracked invitation completion. Apply
+`025_existing_invitation_state.sql` to retain the state of existing provider
+invitations. These additive migrations retain clinical/profile identities and
+send no email. A build does not apply them automatically.
 
 Production clinic use needs HTTPS origins, full Resend credentials, a verified
 replacement custom sender, configured Supabase Auth mail/redirects, and

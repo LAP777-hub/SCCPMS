@@ -9,12 +9,16 @@ export function connectClinicUpdates() {
   let expectedSession: Session | null = null;
   async function listen() {
     while (!controller.signal.aborted) {
+      const attempt = new AbortController();
+      // A dropped mobile connection or stalled proxy must not leave a reader
+      // waiting forever. Server streams normally close within 50–60 seconds.
+      const deadline = window.setTimeout(() => attempt.abort(), 75_000);
       try {
         const session = await currentAuthSession();
         if (!session || version !== sessionRequestVersion()) return;
         if (expectedSession && !sameAuthSession(expectedSession, session)) return;
         expectedSession ??= session;
-        const response = await authenticatedFetch('/api/events', { signal: controller.signal });
+        const response = await authenticatedFetch('/api/events', { signal: AbortSignal.any([controller.signal, attempt.signal]) });
         if (controller.signal.aborted || version !== sessionRequestVersion()) {
           await response.body?.cancel().catch(() => undefined);
           return;
@@ -81,6 +85,9 @@ export function connectClinicUpdates() {
         }
       } catch {
         /* Dashboard polling remains available while the stream reconnects. */
+      } finally {
+        window.clearTimeout(deadline);
+        attempt.abort();
       }
       if (!controller.signal.aborted)
         await new Promise<void>(resolve => {

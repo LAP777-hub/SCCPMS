@@ -14,11 +14,11 @@ router.get(
       WITH clinic AS (SELECT timezone, (now() AT TIME ZONE timezone)::date AS today FROM clinic_settings WHERE id=true)
       SELECT
         (SELECT count(*)::int FROM profiles p LEFT JOIN account_status a ON a.user_id=p.id
-          WHERE p.role IN ('patient','student','lecturer','staff') AND COALESCE(a.active,true)) AS patients,
+          WHERE p.role IN ('patient','student','lecturer','staff') AND COALESCE(a.active,true) AND a.deleted_at IS NULL AND a.deletion_requested_at IS NULL) AS patients,
         (SELECT count(*)::int FROM clinic_doctors d LEFT JOIN account_status a ON a.user_id=d.user_id
-          WHERE d.active AND COALESCE(a.active,true)) AS doctors,
+          WHERE d.active AND COALESCE(a.active,true) AND a.deleted_at IS NULL AND a.deletion_requested_at IS NULL) AS doctors,
         (SELECT count(*)::int FROM profiles p LEFT JOIN account_status a ON a.user_id=p.id
-          WHERE p.role IN ('doctor','receptionist') AND COALESCE(a.active,true)) AS staff,
+          WHERE p.role IN ('doctor','receptionist') AND COALESCE(a.active,true) AND a.deleted_at IS NULL AND a.deletion_requested_at IS NULL) AS staff,
         (SELECT count(*)::int FROM appointments a, clinic c
           WHERE (a.starts_at AT TIME ZONE c.timezone)::date=c.today AND a.status<>'cancelled') AS "appointmentsToday",
         (SELECT count(*)::int FROM appointments WHERE status='pending' AND ends_at>now()) AS "pendingAppointments",

@@ -15,6 +15,7 @@ export type AuthContext = {
   email: string;
   phone: string | null;
   profile: Record<string, unknown>;
+  invitedAt?: string;
 };
 
 declare module 'express-serve-static-core' {
@@ -116,6 +117,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     req.auth = {
+      ...(typeof user.invited_at === 'string' ? { invitedAt: user.invited_at } : {}),
       userId: user.id,
       sessionId,
       role: trustedRole,

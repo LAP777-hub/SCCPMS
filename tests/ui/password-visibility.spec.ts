@@ -46,6 +46,7 @@ async function mockServices(page: Page, role = 'patient') {
       await state.registrationGate;
       return route.fulfill({ status: 201, json: { message: 'Check your email to confirm your account before signing in.' } });
     }
+    if (path === '/auth/invitation/complete') { state.passwordUpdates.push(request.postDataJSON()); await state.passwordUpdateGate; return route.fulfill({ json: { message: 'Accepted fixture' } }); }
     if (path === '/auth/profile') return route.fulfill({ json: { data: { id: userId, role, email: user.email, full_name: 'Visibility Fixture', phone: null } } });
     if (path === '/auth/otp/status') return route.fulfill({ json: { verified: false } });
     if (path === '/auth/otp/send') return route.fulfill({ status: 202, json: { deliveryMode: 'email', destination: 'vi***@example.invalid', message: 'Fixture verification requested.' } });

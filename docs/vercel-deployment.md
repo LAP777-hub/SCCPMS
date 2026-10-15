@@ -90,9 +90,9 @@ Use the exact pooler host and username supplied for the project. A Supabase API 
 
 Keep certificate verification enabled. The API bundles the Supabase root CA, with `DATABASE_SSL_CA` available for an explicit override. Its database helper removes URI `sslmode`, `sslcert`, `sslkey` and `sslrootcert` overrides so they cannot weaken the explicit `verify-full` policy. This handles node-postgres's URI precedence rather than disabling certificate checks. [node-postgres SSL options](https://node-postgres.com/features/ssl).
 
-On Vercel, cross-instance updates use the durable database change log and bounded SSE: streams last up to 50 seconds, with authentication rechecked every 15 seconds, then reconnect. Persistent PostgreSQL `LISTEN` is disabled in that runtime. **Only port 6543 is required for Vercel clinic queries.** `DATABASE_EVENTS_URL` on port 5432 belongs to local or other persistent hosting that uses `LISTEN`; omit it from Vercel. Dashboard polling remains available when the event stream cannot connect.
+On Vercel, cross-instance updates use the durable database change log and bounded SSE: streams check for changes every two seconds, last up to 50 seconds, and recheck authentication every 15 seconds before reconnecting. Persistent PostgreSQL `LISTEN` is disabled in that runtime. **Only port 6543 is required for Vercel clinic queries.** `DATABASE_EVENTS_URL` on port 5432 belongs to local or other persistent hosting that uses `LISTEN`; omit it from Vercel. A 15-second browser read fallback keeps dashboard data current when the event stream cannot connect.
 
-Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates, `021_shared_request_limits.sql` for shared request/address-provider budgets, `022_otp_delivery_timing.sql` for pending/accepted OTP timing and safe resends, and `023_otp_sender_binding.sql` for retries using the saved sender.
+Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates, `021_shared_request_limits.sql` for shared request/address-provider budgets, `022_otp_delivery_timing.sql` for pending/accepted OTP timing and safe resends, `023_otp_sender_binding.sql` for retries using the saved sender, `024_account_records_invitations.sql` for retained-account replacement links and invitation tracking, and `025_existing_invitation_state.sql` for the state of existing provider invitations.
 
 ```sh
 npm ci --prefix server
@@ -100,6 +100,15 @@ npm run db:migrate --prefix server
 ```
 
 Use the migration runner's securely configured database connection and verified TLS. Supabase recommends a direct connection for administration; use an appropriate reachable connection for your environment. For an existing installation that needs trusted role metadata repaired, the operator can run `npm run auth:sync-claims --prefix server`. Builds do not create sample users or run migrations automatically.
+
+Admin deletion requires an already deactivated patient, doctor or receptionist.
+Records retains the deleted identity's contacts and offers reinvitation with a
+new Auth UUID; clinical history stays attached to the former identity. Existing
+email accounts return `409 ACCOUNT_EMAIL_IN_USE` without profile or role
+overwrites. Account lifecycle changes and password-acknowledged invitation
+acceptance create persisted in-app notices. Admin report charts use real records
+over a selected range of at most 366 days. These workflows still require the
+general email sender and SMTP setup below before real onboarding.
 
 The recorded university-network PostgreSQL timeout remains a separate local-network issue. Hosting the API on Vercel changes its network path but does not prove connectivity; require a deployed `/healthz` response of 200 with its database healthy. See [the connection diagnostic](session-connectivity.md).
 

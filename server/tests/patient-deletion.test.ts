@@ -154,8 +154,8 @@ function fixture(options: FixtureOptions = {}) {
     deletions: () => external.filter(request => request.method === 'DELETE') };
 }
 
-async function call(method = 'delete', role = 'admin', body: unknown = {}, id = patientId, actor = adminId) {
-  const route = api.stack.find((item: any) => item.route?.path === '/patients/:id' && item.route?.methods[method]);
+async function call(method = 'delete', role = 'admin', body: unknown = {}, id = patientId, actor = adminId, family = 'patients') {
+  const route = api.stack.find((item: any) => item.route?.path === `/${family}/:id` && item.route?.methods[method]);
   assert.ok(route);
   const result = { status: 200, body: undefined as any };
   const res = { status(code: number) { result.status = code; return res; }, json(value: unknown) { result.body = value; return res; } };
@@ -166,6 +166,35 @@ async function call(method = 'delete', role = 'admin', body: unknown = {}, id = 
   }
   return result;
 }
+
+for (const profileRole of ['doctor','receptionist']) {
+  test(`an administrator deletes a deactivated ${profileRole} while preserving profile identity and revoking credentials`, async () => {
+    const data = fixture({ profileRole });
+    const result = await call('delete','admin',{},patientId,adminId,'staff');
+    assert.equal(result.status,200);
+    assert.ok(data.state.deleted_at);
+    assert.equal(data.profile.deleted_email,'202600001@spu.ac.za');
+    assert.equal(data.authDeleted,true);
+    assert.equal(data.verifiedSessions,false);
+    assert.equal(data.deletions()[0].body?.should_soft_delete,true);
+    assert.ok(data.queries.some(query=>query.includes('INSERT INTO notifications')));
+  });
+  test(`active ${profileRole} deletion is refused before any provider delete`, async () => {
+    const data = fixture({ profileRole,active:true });
+    assert.equal((await call('delete','admin',{},patientId,adminId,'staff')).status,409);
+    assert.equal(data.deletions().length,0);
+  });
+}
+test('staff deletion rejects other roles and retains pending deletion when its provider fails', async () => {
+  const data = fixture({ profileRole:'doctor', providerFailures:1 });
+  for (const role of ['doctor','patient','receptionist']) assert.equal((await call('delete',role,{},patientId,adminId,'staff')).status,403);
+  const first = await call('delete','admin',{},patientId,adminId,'staff');
+  assert.equal(first.status,503);
+  assert.equal(first.body.code,'STAFF_DELETION_PENDING');
+  assert.equal(data.state.active,false);
+  assert.ok(data.state.deletion_requested_at);
+  assert.equal((await call('delete','admin',{},patientId,adminId,'staff')).status,200);
+});
 
 test('only administrators can delete patient login accounts', async () => {
   const data = fixture();

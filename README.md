@@ -67,6 +67,8 @@ Apply versioned migrations from an authorized, configured administrative environ
 npm run db:migrate --prefix server
 ```
 
+Include migrations `024_account_records_invitations.sql` and `025_existing_invitation_state.sql` before using deleted-account Records, reinvitations and invitation completion. They retain profile/clinical identities and send no email.
+
 For an existing installation that needs trusted role metadata repaired, use `npm run auth:sync-claims --prefix server`. No build or migration creates demo users, sample appointments or invented analytics.
 
 Start the frontend and API together:
@@ -92,7 +94,9 @@ All roles can use any valid email address, including personal and university mai
 
 Appointment and clinical data come from the database. Empty datasets produce zero totals and empty states. Scheduling uses clinic hours, timezone and booking policies, and rejects invalid/conflicting slots. Clinical history and audit records are retained when account access is suspended.
 
-Updates use authenticated SSE with polling fallback. On Vercel the API uses a durable database change log and bounded streams across instances; persistent PostgreSQL `LISTEN` is used only on suitable local or persistent hosting. See [the Vercel guide](docs/vercel-deployment.md) for the runtime and port differences.
+An admin must deactivate a patient, doctor or receptionist before deleting the login account. Deleted accounts remain in Records with retained contact details and a reinvite action. Reinvitation creates a new Auth UUID and does not transfer the former identity's clinical records. An existing email account returns `409 ACCOUNT_EMAIL_IN_USE`; its profile and role are preserved. Account activation, deactivation, deletion and password-confirmed invitation acceptance create persisted in-app notices.
+
+Admin report charts use real records for the selected date range, limited to 366 days. Updates use authenticated SSE with a 15-second read fallback. On Vercel the API checks the durable change log every two seconds within bounded streams across instances; persistent PostgreSQL `LISTEN` is used only on suitable local or persistent hosting. See [the Vercel guide](docs/vercel-deployment.md) for the runtime and port differences.
 
 ## Login and email setup
 

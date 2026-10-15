@@ -97,6 +97,7 @@ async function mockEmailFlow(page: Page, role = 'doctor') {
         await state.apiLogoutGate;
         return fulfill(route, { json: { message: 'Fixture verification ended.' } });
       }
+      if (path === '/auth/invitation/complete') { state.passwordUpdates.push(request.postDataJSON()); await state.passwordGate; return fulfill(route, { json: { message: 'Invitation accepted fixture' } }); }
       if (path === '/auth/otp/status') {
         const session = requestSession(route);
         state.statusCount += 1;
@@ -172,7 +173,7 @@ for (const role of ['doctor', 'receptionist']) {
     expect(fixture.state.verifyLinkCount).toBe(1);
     expect(fixture.state.otpSendCount).toBe(0);
     await setPassword(page);
-    expect(fixture.state.passwordUpdates).toEqual([expect.objectContaining({ password: newPassword, code_challenge: null, code_challenge_method: null })]);
+    expect(fixture.state.passwordUpdates).toEqual([expect.objectContaining({ password: newPassword })]);
     expect(fixture.state.passwordUpdates[0]).not.toHaveProperty('app_metadata');
     expect(fixture.state.passwordUpdates[0]).not.toHaveProperty('user_metadata');
     await page.getByRole('button', { name: 'Return to sign in', exact: true }).click();

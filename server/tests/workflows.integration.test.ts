@@ -127,6 +127,10 @@ test(
         '019_patient_account_deletion.sql',
         '022_otp_delivery_timing.sql',
         '023_otp_sender_binding.sql',
+        '007_realtime_events.sql',
+        '020_serverless_clinic_events.sql',
+        '024_account_records_invitations.sql',
+        '025_existing_invitation_state.sql',
       ]) {
         await rawDbQuery(await readFile(new URL(`../sql/${file}`, import.meta.url), 'utf8'));
       }
@@ -160,6 +164,12 @@ test(
       assert.equal(emptyAnalytics.body.data.clinicalVisits,0);
       assert.equal(emptyAnalytics.body.data.dailyAppointments.length,7);
       assert.ok(emptyAnalytics.body.data.dailyAppointments.every((day: {count:number})=>day.count===0));
+      const emptyReport=await call(clinical,'get','/reports/summary','admin',adminId);
+      assert.equal(emptyReport.status,200,JSON.stringify(emptyReport.body));
+      assert.equal(emptyReport.body.data.appointments,0);
+      assert.equal(emptyReport.body.data.daily_activity.length,30);
+      assert.ok(emptyReport.body.data.daily_activity.every((day:{appointments:number})=>day.appointments===0));
+      assert.equal(emptyReport.body.data.account_counts.admin,1);
       await dbQuery("INSERT INTO profiles(id,email,role) VALUES ($1,'patient@spu.ac.za','patient'),($2,'other@spu.ac.za','patient'),($3,'doctor@spu.ac.za','doctor'),($4,'otherdoctor@spu.ac.za','doctor')",[patientId,secondPatient,doctorUser,otherDoctorUser]);
       const clinicSession=randomUUID();
       const boundEmail=otpEmailHash(patientId,'patient@spu.ac.za')!;
@@ -860,6 +870,10 @@ test(
       assert.equal(report.status, 200, JSON.stringify(report.body));
       assert.equal(report.body.data.appointments, 2);
       assert.equal(report.body.data.cancelled, 1);
+      assert.equal(report.body.data.daily_activity.length, 1);
+      assert.equal(report.body.data.daily_activity[0].appointments, 2);
+      assert.equal(report.body.data.doctor_activity.reduce((total: number, doctor: { appointments: number }) => total + doctor.appointments, 0), 2);
+      assert.equal(report.body.data.account_counts.admin, 1);
       assert.equal(
         (
           await call(
