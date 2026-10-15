@@ -2,13 +2,14 @@
 
 **Report date:** 15 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** all valid recipient emails are accepted, and the SPU sender plan was canceled on 14 October. Its primary sending address has been removed from hosting, and the API redeployed. Both Git-connected Vercel projects are READY for the cancellation implementation, with **95/95 browser tests**, **306 server unit passes with six intentional database skips**, **six real database passes**, security checks and **7/7 live HTTP checks**. The existing bound administrator OTP route remains available; its earlier delivery check was reported delivered, while a live OTP/login round trip still requires the user's request and code entry. No replacement sending domain or SMTP account is available yet, so general mail delivery and clinical acceptance remain incomplete. Earlier failures and corrections remain recorded below.
+**Status:** the account deletion, Records, notifications, live refresh and expanded reports release is published to GitHub and both Vercel projects are READY for application commit `da399a9`. Its completed cloud workflow passed **342 server unit checks with six intentional database skips**, **six separate real database cases**, **99/99 browser cases**, builds and security checks. **7/7 live HTTP checks** passed against the deployed frontend and API. Migrations 024/025 are applied. Section 11h records this release and its test boundaries.
 
-**Release candidate on 15 October:** staff deletion, deleted-account Records,
-expanded reports and notification regressions pass local validation: **342
-server passes / six explicit database skips**, **99/99 browser cases**, and the
-affected real PostgreSQL cases. Migrations024/025 are applied. Source publication
-and hosted acceptance are recorded in section 11h as they complete.
+All valid recipient emails are accepted. The SPU sender plan remains canceled,
+and no replacement sending domain or SMTP account is available yet. General
+invitation, confirmation and OTP delivery therefore remains incomplete. The
+bound administrator OTP route remains available; its earlier diagnostic email
+was delivered, while a real OTP/login round trip and live clinical acceptance
+are still unverified. Earlier failures and corrections remain recorded below.
 
 This report preserves successful checks, failures, skips, warnings and remaining acceptance work. It does not certify that the system is error-free, suitable for unrestricted clinical use, or fully production ready. Earlier applications in `legacy/frontend/` and `legacy/backend/` are outside the active release validation.
 
@@ -43,11 +44,11 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest completed cloud server unit run | **312 total: 306 passed, 6 skipped, 0 failed** | Node22; six real database cases opt in; cancellation implementation workflow |
+| Latest completed cloud server unit run | **348 total: 342 passed, 6 skipped, 0 failed** | Node 22; six real database cases opt in; account operations workflow for `da399a9`, 57.116s |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI; includes OTP timing/recovery, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
+| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI for `da399a9`, 3.410s; includes all-role deletion/history, OTP timing/recovery, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -66,7 +67,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **95 passed, 0 failed** | GitHub Linux CI for `0c413b1`, 1.4 minutes; email flows, unrestricted recipient email, logout fallback and existing roles/registration/session checks |
+| Latest full browser run | **99 passed, 0 failed** | GitHub Linux CI for `da399a9`, 1.2 minutes; Records/deletion/reinvite, reports/mobile plots, cross-role mocked live refresh and existing email/registration/session checks |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -79,14 +80,14 @@ These are completed results available when this report was assembled. Counts fro
 | Admin/doctor/patient/receptionist login and assigned dashboard | Four-role mocked browser OTP/reload checks; server trusted role/confirmation/account guards | Real authorized users must receive/verify university email messages |
 | Student/staff self-registration | Mailbox/identity/catalogue/address validation; actual registration handler in a private SQL schema; browser payload/selection checks | Real confirmation delivery and institution-approved enrolment/identity process |
 | Admin-created doctor/receptionist accounts | Role-protected invitation callback/provider-contract tests; recipient password setup and OTP gates under mocks | Invitation delivered to the intended real recipient |
-| Account suspension/patient-login deletion | Active-account denial/compensation and provider-ban tests; 20 server policy, seven deletion UI and eleven suspension/dependency/race UI cases; private SQL deletion suite and applied migration 019 | No live user was deleted to prove the fixture; production operations require the institutional acceptance gates |
+| Account suspension/deletion, Records and reinvitation | Active-account denial/compensation, provider-ban and all-role deletion/history checks; Records contacts/reinvite UI; safe fresh-identity provisioning; applied migrations 019/024/025 | No live user was deleted to prove the fixture; actual reinvitation delivery and operational acceptance remain outstanding |
 | Booking/cancellation/rescheduling | Role policy and real private-schema slot/appointment state/ownership/conflict checks | Real operators exercise end-to-end use after deployment/provider setup |
 | Availability/leave/closures | Timezone/hours/holiday policies, SQL constraints, booked-care conflict and approved-leave exclusion checks | Institution reviews actual timezone, hours, holidays and booking notice settings |
 | Doctor SOAP/vitals/prescriptions/labs | Validation fixtures and isolated clinician-owned clinical persistence/corrections where asserted | Clinical documentation and released-result workflows accepted by responsible clinicians |
 | Patient health records | Assigned/own-record ownership checks and mocked records dashboard | Real authorized-patient record release and access acceptance |
 | Reception patient intake/walk-ins | Active-patient serialization tests and real private-schema linkage/assigned consultation checks | Front desk accepts actual intake/queue process with authorized accounts |
-| Notifications and refresh | Persisted clinic workflow data, event shutdown tests, mocked incoming-change/polling browser behavior | Live multi-user authorized SSE/reconnection/notification acceptance is not proven by mocked browser traffic |
-| Reports/analytics | Real isolated zero-data analytics plus mocked change/zero dashboard checks; report views and responsive tables | Actual operated clinic counts must be reconciled; fixtures are never presented as production analytics |
+| Notifications and refresh | Persisted appointment/account/invitation-acceptance notices, event shutdown tests, separate admin/doctor/patient browser sessions with mocked streams and polling fallback | Live multi-user authorized SSE/reconnection/notification acceptance is not proven by mocked browser traffic |
+| Reports/analytics | Real isolated zero-data analytics, read-only production aggregation consistency, date-range validation and browser checks for charts, zero states, retained filters and readable mobile plots | Actual operated clinic counts must be reconciled; fixtures are never presented as production analytics |
 | Audit/history preservation | Isolated audit rows/pagination and transaction/record history checks | Hosted retention, backup/restore and institutional access policy acceptance |
 
 ## 4. Chronological failure, fix and rerun record
@@ -1053,7 +1054,7 @@ active/inactive/deleted account totals are labeled separately from activity
 within the chosen date range; empty datasets remain zero or explicit empty
 states. None of these changes establishes general email delivery readiness.
 
-| Check completed so far | Result and boundary |
+| Completed check | Result and boundary |
 | --- | --- |
 | Full server unit command | **329 total: 323 passed, six intentional database skips, zero failed**, Node22, **84.520s** |
 | Focused staff/patient deletion checks | **25/25 passed** |
@@ -1072,6 +1073,9 @@ states. None of these changes establishes general email delivery readiness.
 | Publication scan | **482 indexed files, zero findings** |
 | Actual production SQL report check | Read-only transaction passed:30 daily dates, matching totals/series/doctor workload and nonnegative account counts; no personal rows printed or provider calls |
 | Migrations024/025 | Applied under the migration lock and verified:version ledger, RLS and durable change triggers; invitation state backfilled without changing authentication or clinical rows; no emails sent |
+| GitHub cloud release checks | Application commit `da399a923597f52ce61f712c79135396ba5bdec9`: **348 total unit checks / 342 passed / six intentional skips / zero failures** in 57.116s; separate **six real PostgreSQL cases passed** in 3.410s; **99 browser cases passed** in 1.2 minutes; frontend/backend builds, typechecks and security jobs succeeded |
+| Vercel release | Frontend `sccpms` and backend `sccpms-api` both READY for the exact application commit `da399a9`; no new live user accounts were created or deleted for acceptance |
+| Deployed read-only HTTP acceptance | **7/7 passed**: frontend assets/API origin, invitation callback deep link, API root, PostgreSQL health with verified TLS, unauthenticated GET/POST rejection, production CORS and JSON 404; checked at 00:08 UTC / 02:08 SAST on 15 October |
 
 The browser/provider fixtures do not send emails, delete real users or prove a
 live multi-user clinic session. The isolated PostgreSQL cases exercise real
@@ -1092,10 +1096,16 @@ within their card to preserve readable labels. Background refreshes retain
 unapplied report filters, and stalled stream readers reconnect while polling
 remains available.
 
-Release commit and deployment verification are recorded after publication.
-The verified replacement sender, Supabase
-custom SMTP and live clinical/inbox acceptance remain outstanding; the SPU
-sender plan remains canceled.
+The application release is published at
+[commit da399a9](https://github.com/LAP777-hub/SCCPMS/commit/da399a923597f52ce61f712c79135396ba5bdec9).
+Its [GitHub workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38657985344)
+completed successfully. The hosted application is
+[SCCPMS](https://sccpms.vercel.app), using the
+[deployed API](https://sccpms-api.vercel.app). This final evidence update changes
+documentation only. The verified replacement sender, Supabase custom SMTP and
+live clinical/inbox acceptance remain outstanding; the SPU sender plan remains
+canceled. A successful invitation API/provider acknowledgement is not a promise
+of inbox delivery.
 
 ## 12. Supporting documents
 
