@@ -1,76 +1,109 @@
 # Production email delivery
 
-SCCPMS has two email channels: Supabase Auth sends signup confirmations, staff invitations and password recovery; the API sends login OTPs through Resend. General delivery needs a verified sender and custom SMTP for Auth. All valid recipient addresses are accepted by the application for every role: Gmail, Outlook, Yahoo, university addresses and other domains. Email confirmation and login OTP remain required. Students still need their university identity number, faculty/programme and residential address; their email need not match their number. Provider delivery restrictions still apply until setup is complete.
+All valid recipient email addresses are accepted. Email confirmation and login
+OTP remain required. Students still supply university identity, programme and
+residential address; email need not match the university number.
 
-## Current sender configuration
+## Provider routing
 
-The user canceled the SPU sender setup on **14 October 2026**. Leave `RESEND_FROM_EMAIL` unset or empty until a replacement domain you own is verified in Resend. Do not continue sending from `login@clinic.spu.ac.za`. The existing owner-admin route remains available with its complete private account binding; other users receive a safe delivery-unavailable response while the primary sender is empty. No replacement provider or general sender is promised or configured by this change.
+| Email | Provider | Private configuration |
+| --- | --- | --- |
+| Configured owner administrator login OTP | Resend API | `RESEND_API_KEY`, `RESEND_ADMIN_OWNER_EMAIL`, `RESEND_ADMIN_OWNER_USER_ID` |
+| Patient, student, lecturer/staff patient, doctor and receptionist login OTP | Brevo API | `BREVO_API_KEY`, `BREVO_FROM_EMAIL` |
+| Confirmation, invitation and password recovery | Supabase Auth through Brevo SMTP | Hosted SMTP settings, configured with the administrative helper |
 
-Earlier on 14 October, Resend reported `clinic.spu.ac.za` as `not_started`, with its DNS records unpublished; a production OTP attempt returned HTTP 403. This established a configuration blocker, not inbox delay. [The previous DNS handoff](../RESEND_UNIVERSITY_DNS.md) is retained as historical and optional. SPU DNS approval is no longer an active setup requirement.
+Resend requires the exact trusted admin role, Auth UUID and normalized owner
+email. Its fixed sender is `SCCPMS <onboarding@resend.dev>`. Other administrators
+fail closed; other roles cannot use Resend even with the owner's email. There
+is no cross-provider fallback. Keep `RESEND_FROM_EMAIL` empty and retain both
+owner settings when adding Brevo.
 
-A replacement can use any domain you own and verify in Resend; it need not be a university domain. A personal Gmail address cannot serve as a verified Resend sender. After verification, update `RESEND_FROM_EMAIL` in the API's Vercel environment and ignored `server/.env`, then redeploy/restart. Keep `RESEND_API_KEY` private, never in a frontend variable. Enable sending and disable click/open tracking for authentication links. [Verified sender domains](https://resend.com/docs/dashboard/domains/introduction).
+The SPU sender plan was canceled on 14 October 2026. Brevo supports verifying an
+individual sender mailbox without owning SPU's domain. Free-mail senders still
+have authentication/deliverability limitations; a verified domain is preferable
+for clinic operation. Sender verification, transactional account activation and
+plan quotas apply. [Brevo sender verification](https://help.brevo.com/hc/en-us/articles/208836149-Create-a-new-sender-From-name-and-From-email).
 
-Supabase custom SMTP is currently absent. Its default mail service restricts confirmation, invitation and recovery delivery to project-team addresses. Any valid email passes the application's validation, but general onboarding cannot deliver until custom SMTP is configured. Do not disable confirmation or OTP to work around that limitation. [Supabase SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp).
+## Current external blocker
 
-## Temporary access for the Resend owner administrator
+Credentials are saved in ignored server configuration. Live account and sender
+inspection returned **HTTP 401, IP authorisation blocked**, including the recheck
+during the 15–16 October implementation. SMTP username, verified sender and relay
+status cannot be established while these requests are blocked. No Brevo inbox
+delivery or Supabase SMTP installation is claimed yet.
 
-The user confirmed that their existing administrator email is also the Resend account email. The API has an optional owner-only route that sends a real login OTP from `SCCPMS <onboarding@resend.dev>` to that administrator. This is Resend's documented default-sender restriction, not a general production sender. [Resend owner-only sender](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
+Open Brevo **Settings → Security → Authorized IPs**. API and SMTP blocking have
+separate switches. Standard Vercel outbound addresses can change; Supabase SMTP
+originates from Supabase rather than this laptop. Use controlled fixed outbound
+addresses and authorise every relevant source, or configure the provider's IP
+policy for this hosting arrangement. Local IP approval alone does not establish
+hosted access. [Brevo IP policy](https://help.brevo.com/hc/en-us/articles/5740111683858-Authorize-and-block-IP-addresses-for-API-and-SMTP-security).
 
-`RESEND_ADMIN_OWNER_EMAIL` and `RESEND_ADMIN_OWNER_USER_ID` are configured together in private API settings. The server requires a confirmed active account with trusted `admin` role, the exact configured Auth ID, and matching authenticated email and recipient. Production accepts an empty primary sender only with this complete valid binding. Other roles, IDs and emails can use only the primary sender and fail safely while it is empty. The default sender is never enabled globally; production mode, credentials, OTP verification, single-use hashes, session binding, expiry and attempt limits remain enforced.
+## Configure Brevo and Supabase
 
-Migration `023_otp_sender_binding.sql` retains each challenge's exact sender, so a retry cannot change its provider payload when deployment settings change. A previously uncertain request retains its stored sender; the new owner route does not reinterpret it. Remove both owner settings only after a verified replacement sender is configured, then redeploy. Ordinary clinic mail and Supabase custom SMTP still require that verified sender. A domain-readiness check describes the primary sender and remains unavailable while it is empty, even when this one administrator route works.
+In ignored `server/.env`, configure `BREVO_API_KEY`, `BREVO_FROM_EMAIL`,
+`BREVO_SMTP_USERNAME`, `BREVO_SMTP_PASSWORD`, `SUPABASE_ACCESS_TOKEN`, and
+`FRONTEND_ORIGIN=https://sccpms.vercel.app`. The SMTP host is
+`smtp-relay.brevo.com`; port 587 uses STARTTLS, with 465 also supported. Use the
+SMTP username shown by Brevo, not an assumed account email.
 
-A delivery-check email containing no login code was accepted by Resend and reported delivered on 14 October. Real OTPs are generated only by the normal authenticated sign-in flow; request a fresh code from the live application.
+The runtime API needs only Brevo's API key and sender in the backend Vercel
+project's production secrets, followed by redeployment. Supabase needs the SMTP
+username and SMTP key. API, SMTP and encoded MCP credentials are not
+interchangeable. Never place them in frontend `VITE_` settings.
 
-## Configure Supabase mail after verification
-
-Use Node 22.12+ from a secured administrative computer. The runner reads ignored `server/.env`; set `FRONTEND_ORIGIN=https://sccpms.vercel.app`, the approved `RESEND_FROM_EMAIL`, and private `SUPABASE_ACCESS_TOKEN` and `RESEND_API_KEY` there. Never paste credentials into commands, issue bodies or committed files.
+Use Node 22.12+:
 
 ```sh
-npm run auth:configure-email --prefix server -- --inspect
-npm run email:check --prefix server -- --production
+npm run auth:configure-brevo --prefix server -- --inspect
+npm run auth:configure-brevo --prefix server -- --apply-smtp
+npm run auth:configure-brevo --prefix server -- --apply-templates
 ```
 
-Inspection is read-only and returns status categories without passwords or mailbox addresses. A sending-only Resend key cannot inspect domains; use a domain-readable administrative key for this operation. The API can retain a restricted sending key.
+The helper sends no emails. It verifies an active sender and relay, matches the
+SMTP username to the account, requires an SMTP key, preserves redirects and
+reads back saved changes. It keeps confirmation enabled, a 30-second Auth mail
+cooldown and at least 30 messages/hour, subject to provider quotas. Readback
+does not prove SMTP authentication or inbox delivery.
+[Brevo SMTP](https://developers.brevo.com/docs/smtp-integration),
+[Supabase custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
 
-Deploy the frontend with `email_action` support before updating hosted templates. Link settings can be updated while SMTP is pending:
+The template command requires matching Brevo SMTP. It preserves existing
+callbacks, sets new links to two hours and points to the live application.
+Emails open the application wrapper; its Continue button follows the validated
+Supabase verification URL. Disable Brevo link tracking for authentication mail
+and verify actual links before accepting onboarding. Existing emails retain
+their original expiry. The older Resend SMTP helper is historical.
 
-```sh
-npm run auth:configure-email --prefix server -- --apply-links
-```
+## OTP timing and invitations
 
-This sets the production Site URL, preserves existing redirect entries, adds required production callbacks, sets new Auth links to two hours, and keeps email confirmation enabled. It leaves SMTP and templates unchanged. Existing emailed links retain their original expiry and cannot be restored after use.
+Codes last ten minutes from provider acknowledgement, with a 30-second resend
+cooldown. Failed resends preserve an existing valid code. Replacements activate
+only after provider acknowledgement and database commit. Single-use hashes,
+session/email binding, five failed guesses and ten new challenges/hour remain
+enforced. Missing configuration does not reserve a new challenge.
 
-When the sender domain is verified:
+Provider calls have a ten-second budget and at most one transient retry, using
+the same payload and challenge key. Resend uses HTTP `Idempotency-Key`; Brevo
+uses JSON `headers.idempotencyKey`. A Brevo duplicate without a message reference
+remains unknown delivery, never a false success. An uncertain code may remain
+pending until its 15-minute draft expires. Reducing timers cannot fix provider
+outages or inbox filtering.
+[Brevo transactional API](https://developers.brevo.com/docs/send-a-transactional-email),
+[Brevo idempotency](https://developers.brevo.com/docs/heterogenous-versions-batch-emails).
 
-```sh
-npm run auth:configure-email --prefix server -- --apply-smtp
-```
+Invited doctors/receptionists follow the live link, create and confirm a
+password, then sign in and verify OTP for their trusted role. Signup confirmation
+returns patients to sign-in. Invitation acceptance notifications and audits
+follow provider acknowledgement. Browser role selection never grants access.
 
-The runner refuses to change SMTP unless the exact sender domain is verified, sending is enabled and tracking is disabled. It configures `smtp.resend.com`, port 465, username `resend`, the private API key as password, and the approved sender; sets a 30-second mail cooldown and an Auth email quota of at least 30/hour; and verifies saved settings without printing credentials. Adjust quotas for measured traffic and the Resend plan. [Resend's Supabase SMTP setup](https://resend.com/docs/send-with-supabase-smtp).
+## Live acceptance
 
-After custom SMTP is configured, install the branded templates:
+After IP access, sender verification and SMTP setup, measure provider acceptance
+and receipt for signup, doctor/receptionist invitations, recovery and login OTP.
+Confirm links return to `https://sccpms.vercel.app`, staff create passwords and
+every role reaches its dashboard. Check delivery/bounce events and spam folders.
+Automated fixtures send no real mail and do not establish inbox speed. Keep the
+admin Resend route available while Brevo is incomplete.
 
-```sh
-npm run auth:configure-email --prefix server -- --apply-templates
-```
-
-The hosted free-tier project rejected template changes with its default mail provider (HTTP 400 on 14 October). The runner now reports the custom-SMTP prerequisite without attempting that rejected mutation. Templates are prepared in code but remain unapplied until SMTP is ready. Once installed, each email first opens the live application; only an explicit Continue click follows its validated Supabase verification URL. This reduces accidental consumption by email scanners.
-
-Supabase's default mail service is restricted to project-team addresses and two messages/hour, with no delivery SLA. General production mail needs custom SMTP. [Supabase SMTP documentation](https://supabase.com/docs/guides/auth/auth-smtp).
-
-## Login timing and staff invitations
-
-Login OTPs are valid for ten minutes **from the provider's acknowledgement**, with a 30-second resend cooldown. The UI receives the actual expiry from the server. An unsuccessful resend preserves an existing valid code. A new code replaces it only after the provider accepts sending. Codes are bound to the authenticated account, email and session, permit five failed guesses, and limit new challenges to ten/hour per account.
-
-Provider requests have a ten-second total budget with at most one retry of transient failures. Retries reuse the same Resend idempotency key and message, so an ambiguous response does not cause a second distinct email. Permanent sender/quota failures fail promptly. Acknowledgement means accepted for sending; it does not prove arrival in the recipient's inbox. [Resend idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys).
-
-An invited doctor or receptionist opens the live confirmation page, clicks Continue, chooses and confirms a password, then signs in with that password and completes email OTP to reach their assigned dashboard. Signup confirmation returns patients to sign-in. The account's trusted role and email are retained for convenience; role selection never grants access. Authentication fetches and logout have deadlines, and temporary invitation/profile setup delays offer a retry.
-
-Apply migration `022_otp_delivery_timing.sql` before deploying the new API. It adds delivery timing and pending-challenge state without deleting existing users, records or accepted codes. Defaults can be changed with `OTP_VALIDITY_SECONDS` (120–900) and `OTP_RESEND_COOLDOWN_SECONDS` (30–300).
-
-## Live acceptance still required
-
-After DNS, provider verification and SMTP are complete, use authorized recipients to check one signup confirmation, one doctor invitation, one receptionist invitation and one login OTP. Record request, provider-acceptance and receipt times separately; inspect Resend delivery/bounce events and spam folders. Confirm the address bar returns to `https://sccpms.vercel.app`, staff can choose passwords, and each role reaches its own dashboard. Localhost callbacks are for development on the recipient's computer.
-
-Automated browser/provider checks send no real messages and cannot establish inbox latency. Do not promise delivery within seconds until measured in the recipients' mail systems. Current successes, failures and remaining acceptance work are in [the testing report](TESTING_REPORT.md).
+[Testing results, failures and remaining acceptance](TESTING_REPORT.md).

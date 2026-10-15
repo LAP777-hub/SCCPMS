@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { config, configSchema } from '../src/config.js';
 
-const production = { ...config, NODE_ENV: 'production', FRONTEND_ORIGIN: 'https://clinic.example.invalid', DATABASE_SSL_MODE: 'verify-full', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>', RESEND_ADMIN_OWNER_EMAIL: '', RESEND_ADMIN_OWNER_USER_ID: '' };
-test('production accepts Resend credentials, a custom-domain sender, exact HTTPS origin and certificate-verified database', () => {
-  assert.equal(configSchema.safeParse(production).success, true);
+const production = { ...config, NODE_ENV: 'production', FRONTEND_ORIGIN: 'https://clinic.example.invalid', DATABASE_SSL_MODE: 'verify-full', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>', RESEND_ADMIN_OWNER_EMAIL: 'admin.owner.fixture@gmail.com', RESEND_ADMIN_OWNER_USER_ID: '00000000-0000-4000-8000-000000000081', BREVO_API_KEY: '', BREVO_FROM_EMAIL: '' };
+test('a legacy Resend sender alone cannot enable general production delivery', () => {
+  assert.equal(configSchema.safeParse({ ...production, RESEND_ADMIN_OWNER_EMAIL: '', RESEND_ADMIN_OWNER_USER_ID: '' }).success, false);
 });
 
 test('owner-only delivery requires a complete valid account binding and cannot make the global test sender a production sender', () => {
@@ -37,7 +37,6 @@ test('an absent primary sender permits only the explicitly configured owner boot
 for (const [name, changes] of [
   ['missing Resend API key', { RESEND_API_KEY: '' }],
   ['invalid Resend API key prefix', { RESEND_API_KEY: 'test_fixture_only' }],
-  ['missing email sender', { RESEND_FROM_EMAIL: '' }],
   ['Resend test-domain sender', { RESEND_FROM_EMAIL: 'onboarding@resend.dev' }],
   ['Resend test-domain display sender', { RESEND_FROM_EMAIL: 'SCCPMS Clinic <onboarding@resend.dev>' }],
   ['Resend test subdomain sender', { RESEND_FROM_EMAIL: 'clinic@sub.resend.dev' }],

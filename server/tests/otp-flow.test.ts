@@ -105,8 +105,9 @@ test('email OTP uses Resend with the authenticated email and challenge idempoten
       { status: accepted ? 200 : 422 }
     );
   });
-  const settings = { NODE_ENV: 'production' as const, RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>' };
-  await sendOtpEmail(email, '123456', userId, settings);
+  const settings = { NODE_ENV: 'production' as const, RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: '', RESEND_ADMIN_OWNER_EMAIL: email, RESEND_ADMIN_OWNER_USER_ID: userId };
+  const owner = { userId, role: 'admin', email };
+  await sendOtpEmail(email, '123456', userId, settings, 600, {}, owner);
   accepted = false;
-  await assert.rejects(sendOtpEmail(email, '123456', userId, settings));
+  await assert.rejects(sendOtpEmail(email, '123456', userId, settings, 600, {}, owner));
 });

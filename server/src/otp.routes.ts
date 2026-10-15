@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import { Router, type Request, type Response } from 'express';
 import { pool } from './db.js';
 import { requireAuth } from './auth.js';
-import { sendOtpEmail, selectOtpEmailSender, EmailDeliveryError } from './email.js';
+import { sendOtpEmail, selectOtpEmailSender, selectOtpEmailDelivery, otpEmailDeliveryReady, EmailDeliveryError } from './email.js';
 import { otpCodeHash, otpEmailHash } from './otp-security.js';
 import { maskEmailAddress } from './email-address.js';
 import { logger } from './logger.js';
@@ -59,7 +59,7 @@ router.post('/send', async (req, res) => {
 
   const identity = { userId, sessionId, emailHash };
   const selectedSender = selectOtpEmailSender(req.auth!);
-  if (!selectedSender) {
+  if (!selectedSender || !otpEmailDeliveryReady(req.auth!)) {
     // Missing general-mail setup must not insert an invalid sender or consume
     // the account's hourly challenge budget. Keep any accepted code usable.
     return otpProblem(res, 503, 'OTP_EMAIL_UNAVAILABLE', 'Email verification is not configured. Contact the clinic administrator.', 2, identity, email);
@@ -97,7 +97,7 @@ router.post('/send', async (req, res) => {
   let acknowledgedAt = lease.acceptedAt;
   try {
     if (!messageId || !acknowledgedAt) {
-      const delivery = await sendOtpEmail(email, challengeCode(identity, lease.id), lease.id, config, lease.validitySeconds, {}, { userId, role: req.auth!.role, email, senderFrom: lease.senderFrom });
+      const delivery = await sendOtpEmail(email, challengeCode(identity, lease.id), lease.id, config, lease.validitySeconds, {}, { userId, role: req.auth!.role, email, senderFrom: lease.senderFrom, provider: selectOtpEmailDelivery(req.auth!).provider });
       messageId = delivery.messageId;
       acknowledgedAt = new Date();
     }
@@ -110,7 +110,7 @@ router.post('/send', async (req, res) => {
     let persisted = true;
     await recordOtpDeliveryFailure(pool, identity, lease, outcome, retryAfterSeconds).catch(() => { persisted = false; });
     if (reason === 'configuration') return otpProblem(res, 503, 'OTP_EMAIL_UNAVAILABLE', 'Email verification is not configured. Contact the clinic administrator.', retryAfterSeconds, identity, email, persisted);
-    if (reason === 'sender_unverified' || reason === 'authentication' || reason === 'quota_exceeded') {
+    if (reason === 'sender_unverified' || reason === 'authentication' || reason === 'quota_exceeded' || reason === 'ip_authorization') {
       return otpProblem(res, 503, 'OTP_EMAIL_UNAVAILABLE', 'Email verification is temporarily unavailable. Contact the clinic administrator.', retryAfterSeconds, identity, email, persisted);
     }
     if (outcome === 'unknown') return otpProblem(res, 502, 'OTP_DELIVERY_PENDING', 'Delivery could not yet be confirmed. Check your inbox, then retry; the same code will be used.', retryAfterSeconds, identity, email, persisted);

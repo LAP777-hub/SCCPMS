@@ -5,7 +5,8 @@ import otp, { getOtpStatus } from '../src/otp.routes.js';
 import { requireOtp } from '../src/auth.js';
 import { pool } from '../src/db.js';
 import { config } from '../src/config.js';
-import { sendOtpEmail, EmailDeliveryError } from '../src/email.js';
+import { OWNER_OTP_SENDER, EmailDeliveryError } from '../src/email.js';
+import { sendOwnerFixture as sendOtpEmail } from './email-fixtures.js';
 import { otpCodeHash, otpEmailHash } from '../src/otp-security.js';
 import { maskEmailAddress, normalizeEmailAddress, senderEmailAddress } from '../src/email-address.js';
 
@@ -16,11 +17,12 @@ const email = 'patient@spu.ac.za';
 const liveSettings = {
   NODE_ENV: 'production' as const,
   RESEND_API_KEY: 're_test_fixture_only_0123456789',
-  RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>',
+  RESEND_FROM_EMAIL: OWNER_OTP_SENDER,
+  RESEND_ADMIN_OWNER_EMAIL: email, RESEND_ADMIN_OWNER_USER_ID: userId,
 };
-let originalSettings: Pick<typeof config, 'NODE_ENV' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL'>;
+let originalSettings: typeof config;
 beforeEach(() => {
-  originalSettings = { NODE_ENV: config.NODE_ENV, RESEND_API_KEY: config.RESEND_API_KEY, RESEND_FROM_EMAIL: config.RESEND_FROM_EMAIL };
+  originalSettings = { ...config };
   // Routes also use synthetic credentials; fetch is mocked for every provider call.
   Object.assign(config, liveSettings);
 });
@@ -35,7 +37,7 @@ function response() {
   return { result, res: res as unknown as Response };
 }
 const request = (destination = email, phone = '+27123456789', activeSession = sessionId) =>
-  ({ auth: { userId, sessionId: activeSession, email: destination, phone }, body: { code: '123456' } }) as unknown as Request;
+  ({ auth: { userId, sessionId: activeSession, email: destination, phone, role: 'admin' }, body: { code: '123456' } }) as unknown as Request;
 const handler = (path: string) => otp.stack.find((layer: any) => layer.route?.path === path).route.stack.at(-1).handle;
 
 test('email OTP uses Resend and retains its accepted message reference', async () => {

@@ -9,7 +9,7 @@ For GitHub-to-Vercel deployment, use [the deployment guide](docs/vercel-deployme
 | Frontend | Reuse `sccpms` | Repository root (`.`) | Vite: `npm run build`, output `dist` |
 | API | `sccpms-api` | `server` | Express: `npm run build` |
 
-The live frontend is [sccpms.vercel.app](https://sccpms.vercel.app); the live API is [sccpms-api.vercel.app](https://sccpms-api.vercel.app), with a passing [database health check](https://sccpms-api.vercel.app/healthz). Both deploy automatically from this repository's `main` branch and have separate environment variables and `vercel.json`. GitHub CI passes **95 browser tests, 301 server checks and six real database cases**, with six explicit database skips in the unit command. General sender DNS verification, custom SMTP, inbox/clinical acceptance remain required before clinic use; the confirmed owner administrator has a separately tested delivery route. [Testing results and failure history](docs/TESTING_REPORT.md).
+The live frontend is [sccpms.vercel.app](https://sccpms.vercel.app); the live API is [sccpms-api.vercel.app](https://sccpms-api.vercel.app), with a passing [database health check](https://sccpms-api.vercel.app/healthz). Both deploy automatically from this repository's `main` branch and have separate environment variables and `vercel.json`. [Testing results and failure history](docs/TESTING_REPORT.md) distinguish local, cloud, browser and real database checks. General email setup is currently blocked by Brevo IP authorisation; sender, SMTP and inbox acceptance remain required before clinic use. The bound owner administrator retains its Resend OTP route.
 
 ## Project layout
 
@@ -59,7 +59,7 @@ VITE_SUPABASE_ANON_KEY=your-project-public-key
 VITE_API_URL=http://localhost:4000
 ```
 
-The API uses its own Supabase private key, PostgreSQL connection, OTP secret and Resend configuration. PostgreSQL and Supabase Auth/profiles must refer to the **same Supabase project**. Set local `FRONTEND_ORIGIN=http://localhost:5173`; use verified TLS for hosted database connections. Never put private keys, database passwords or email credentials in a `VITE_` variable.
+The API uses its own Supabase private key, PostgreSQL connection, OTP secret and provider configuration. PostgreSQL and Supabase Auth/profiles must refer to the **same Supabase project**. Set local `FRONTEND_ORIGIN=http://localhost:5173`; use verified TLS for hosted database connections. Never put private keys, database passwords or email credentials in a `VITE_` variable.
 
 Apply versioned migrations from an authorized, configured administrative environment:
 
@@ -110,17 +110,16 @@ npm --prefix server run connections:check
 
 The read-only checker distinguishes HTTP/CORS failures from PostgreSQL connectivity. The recorded university-network incident blocked PostgreSQL TCP access while Supabase HTTPS remained healthy. See [the connection diagnostic](docs/session-connectivity.md); changing Auth redirect URLs does not repair that database connection.
 
-Supabase sends confirmation, invitation and password-reset emails. Resend sends the additional login OTP through the API. General delivery needs a verified sender and Supabase custom SMTP; custom SMTP is still absent. Supabase's default mail service accepts only project-team recipients. [Account email links](docs/auth-email-links.md) explains the callback markers and password-setup flow.
+Brevo sends login OTPs for patients, doctors and receptionists. Resend is restricted to the configured owner administrator's exact UUID, trusted role and email. Supabase confirmation, invitation and password-reset emails use Brevo SMTP once its sender, relay and SMTP credentials are verified. [Account email links](docs/auth-email-links.md) explains callbacks and staff password setup.
 
-The SPU sender setup was canceled on **14 October 2026**. Leave `RESEND_FROM_EMAIL` unset or empty until a replacement domain you own is verified in Resend. [The previous DNS handoff](RESEND_UNIVERSITY_DNS.md) is historical and optional; SPU DNS is no longer an active requirement. A verified replacement sender can deliver to any valid recipient domain. See [production email setup](docs/email-delivery.md) for the guarded SMTP/template runner, ten-minute OTPs and live acceptance requirements.
+The SPU sender setup was canceled on **14 October 2026**. Leave `RESEND_FROM_EMAIL` empty and retain both owner bindings. Configure `BREVO_API_KEY` and `BREVO_FROM_EMAIL` privately in the backend environment. Brevo supports verified individual senders; school DNS is not required. [The previous DNS handoff](RESEND_UNIVERSITY_DNS.md) is historical. See [production email setup](docs/email-delivery.md) for the guarded Brevo SMTP/template runner and live acceptance requirements.
 
-The existing administrator retains a temporary real-OTP route through Resend's owner-only sender, bound to the confirmed owner's exact account ID, role and email. Production can start with an empty primary sender only when both owner settings are valid. Other accounts receive a safe delivery-unavailable response until a verified replacement sender is configured. This route does not configure general signup, invitation or recovery SMTP, and does not relax email confirmation, trusted roles or OTP verification.
+Brevo's live API currently rejects account/sender inspection with HTTP401 IP authorisation blocked. Until access, sender and SMTP setup are verified, other users receive safe unavailable responses and general onboarding remains incomplete. The administrator's bound Resend OTP route stays available. Confirmation, trusted roles and OTP verification remain enforced.
 
 Read-only sender checks are available from a securely configured environment:
 
 ```sh
-npm run email:check --prefix server
-npm run email:check --prefix server -- --production
+npm run auth:configure-brevo --prefix server -- --inspect
 ```
 
 ## Validation and builds

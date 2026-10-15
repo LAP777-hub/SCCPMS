@@ -8,9 +8,9 @@ import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
-const privateSetting = /SECRET|PASSWORD|PRIVATE|TOKEN|RESEND_API_KEY|DATABASE(?:_EVENTS)?_URL|SERVICE_ROLE/;
+const privateSetting = /SECRET|PASSWORD|PRIVATE|TOKEN|(?:RESEND|BREVO)_API_KEY|BREVO_MCP|DATABASE(?:_EVENTS)?_URL|SERVICE_ROLE/;
 const placeholder = /(?:your[_-]|replace[_-]|placeholder|changeme|change[_-]me|dummy|fixture|example|redacted|masked|\[[^\]]+\]|<[^>]+>)/i;
-const testToken = /^(?:re_|sbp_|sb_secret_)(?:test|unit|ci|mock|fake)(?:[_-]|[0-9])/i;
+const testToken = /^(?:re_|sbp_|sb_secret_|xkeysib-|xsmtpsib-)(?:test|unit|ci|mock|fake)(?:[_-]|[0-9])/i;
 const excludedPublicSetting = /^(?:VITE_|NEXT_PUBLIC_)|ANON|PUBLISHABLE/;
 
 function isPlaceholder(value) {
@@ -95,6 +95,18 @@ export function scanText(path, content, privateCredentials = new Map()) {
     }
     for (const match of text.matchAll(/\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[A-Z0-9]{16})\b/g)) {
       if (!isPlaceholder(match[0])) add(line, 'provider credential token');
+    }
+    for (const match of text.matchAll(/\b(?:xkeysib-|xsmtpsib-)[A-Za-z0-9_-]{32,}\b/g)) {
+      if (!isPlaceholder(match[0])) add(line, 'Brevo private credential');
+    }
+    for (const match of text.matchAll(/\beyJ[A-Za-z0-9+/_-]{40,}={0,2}/g)) {
+      try {
+        const payload = JSON.parse(Buffer.from(match[0], 'base64').toString('utf8'));
+        if (typeof payload.api_key === 'string' && /^(?:xkeysib-|xsmtpsib-)/.test(payload.api_key)
+          && !isPlaceholder(payload.api_key)) add(line, 'Brevo encoded MCP credential');
+      } catch {
+        // Encoded ordinary text is not evidence of a private provider key.
+      }
     }
     for (const match of text.matchAll(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g)) {
       try {

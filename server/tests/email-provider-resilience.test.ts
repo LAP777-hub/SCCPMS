@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
-import { EmailDeliveryError, sendOtpEmail, type EmailTransport } from '../src/email.js';
+import { EmailDeliveryError, OWNER_OTP_SENDER, type EmailTransport } from '../src/email.js';
+import { sendOwnerFixture as sendOtpEmail } from './email-fixtures.js';
 
-const settings = { NODE_ENV: 'production' as const, RESEND_API_KEY: 're_test_resilience_fixture_0123456789', RESEND_FROM_EMAIL: 'SCCPMS <login@fixture-clinic.co.za>' };
+const settings = { NODE_ENV: 'production' as const, RESEND_API_KEY: 're_test_resilience_fixture_0123456789', RESEND_FROM_EMAIL: OWNER_OTP_SENDER };
 const challenge = '00000000-0000-4000-8000-000000000011';
 const reference = '00000000-0000-4000-8000-000000000012';
 function transport(responses: Array<Response | Error>, budget = 10000) {

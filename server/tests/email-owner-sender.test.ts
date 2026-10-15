@@ -11,7 +11,8 @@ const challengeId = '00000000-0000-4000-8000-000000000033';
 const messageId = '00000000-0000-4000-8000-000000000034';
 const ownerEmail = 'owner.fixture@gmail.com';
 const primarySender = 'SCCPMS <login@verified-fixture.co.za>';
-const primary: EmailSettings = { NODE_ENV: 'production', RESEND_API_KEY: 're_owner_fixture_only_0123456789', RESEND_FROM_EMAIL: primarySender };
+const brevoSender = 'SCCPMS <clinic.fixture@gmail.com>';
+const primary: EmailSettings = { NODE_ENV: 'production', RESEND_API_KEY: 're_owner_fixture_only_0123456789', RESEND_FROM_EMAIL: primarySender, BREVO_API_KEY: 'xkeysib-test_fixture_' + 'a'.repeat(40), BREVO_FROM_EMAIL: brevoSender };
 const configured: EmailSettings = { ...primary, RESEND_ADMIN_OWNER_EMAIL: ownerEmail, RESEND_ADMIN_OWNER_USER_ID: ownerId };
 const owner: OtpEmailAuthorization = { userId: ownerId, role: 'admin', email: ownerEmail };
 
@@ -39,7 +40,7 @@ test('the owner sender is off by default and requires a complete valid configura
     { ...configured, RESEND_ADMIN_OWNER_USER_ID: '' },
     { ...configured, RESEND_ADMIN_OWNER_EMAIL: 'invalid' },
     { ...configured, RESEND_ADMIN_OWNER_USER_ID: 'invalid' },
-  ]) assert.equal(selectOtpEmailSender(owner, settings), primarySender);
+  ]) assert.equal(selectOtpEmailSender(owner, settings), '');
 });
 
 test('only the exact configured admin UUID and normalized email select the fixed owner sender', () => {
@@ -54,7 +55,7 @@ test('only the exact configured admin UUID and normalized email select the fixed
     { ...owner, role: 'patient' },
     { ...owner, role: 'student' },
     { ...owner, role: 'ADMIN' },
-  ]) assert.equal(selectOtpEmailSender(context, configured), primarySender);
+  ]) assert.equal(selectOtpEmailSender(context, configured), ['patient', 'student', 'doctor', 'receptionist'].includes(context.role) ? brevoSender : '');
 });
 
 test('a fully authorized owner uses the real Resend request and acknowledged response in production', async () => {
@@ -76,10 +77,10 @@ test('a fully authorized owner uses the real Resend request and acknowledged res
   assert.ok(!JSON.stringify(delivered).includes('123456'));
 });
 
-test('a configured owner without authorization context still uses only the primary sender', async () => {
+test('a configured owner without authorization context cannot send an email', async () => {
   const fixture = provider();
-  await sendOtpEmail(ownerEmail, '123456', challengeId, configured, 600, fixture.transport);
-  assert.equal(JSON.parse(String(fixture.calls[0].init.body)).from, primarySender);
+  await assert.rejects(sendOtpEmail(ownerEmail, '123456', challengeId, configured, 600, fixture.transport), { reason: 'configuration' });
+  assert.equal(fixture.calls.length, 0);
 });
 
 test('removing the cancelled primary domain preserves real delivery to the authorized owner', async () => {
@@ -92,8 +93,8 @@ test('removing the cancelled primary domain preserves real delivery to the autho
   assert.equal(JSON.parse(String(fixture.calls[0].init.body)).from, OWNER_OTP_SENDER);
 });
 
-test('an unset primary sender does not broaden the owner exception or attempt general email delivery', async () => {
-  const settings = { ...configured, RESEND_FROM_EMAIL: '' };
+test('an unset Brevo sender does not broaden the owner exception or attempt general email delivery', async () => {
+  const settings = { ...configured, RESEND_FROM_EMAIL: '', BREVO_FROM_EMAIL: '' };
   for (const context of [
     undefined,
     { ...owner, userId: otherId },
@@ -157,18 +158,18 @@ test('owner provider retries preserve the stored sender, code, duration and idem
   assert.deepEqual(fixture.waits, [500]);
 });
 
-test('stored normal senders remain stable when the primary configuration changes', async () => {
+test('a stored sender cannot switch a non-admin from a former Resend challenge to Brevo', async () => {
   const fixture = provider();
-  await sendOtpEmail('patient@gmail.com', '123456', challengeId, { ...configured, RESEND_FROM_EMAIL: 'SCCPMS <login@new-verified-fixture.co.za>' }, 600, fixture.transport, {
+  await assert.rejects(sendOtpEmail('patient@gmail.com', '123456', challengeId, configured, 600, fixture.transport, {
     userId: otherId, role: 'patient', email: 'patient@gmail.com', senderFrom: primarySender,
-  });
-  assert.equal(JSON.parse(String(fixture.calls[0].init.body)).from, primarySender);
+  }), { reason: 'configuration' });
+  assert.equal(fixture.calls.length, 0);
 });
 
-test('legacy development and test transport fixtures can still use their configured test sender', async () => {
+test('development and test modes do not permit unbound Resend delivery', async () => {
   for (const NODE_ENV of ['development', 'test'] as const) {
     const fixture = provider();
-    await sendOtpEmail(ownerEmail, '123456', challengeId, { ...primary, NODE_ENV, RESEND_FROM_EMAIL: 'onboarding@resend.dev' }, 600, fixture.transport);
-    assert.equal(JSON.parse(String(fixture.calls[0].init.body)).from, 'onboarding@resend.dev');
+    await assert.rejects(sendOtpEmail(ownerEmail, '123456', challengeId, { ...primary, NODE_ENV, RESEND_FROM_EMAIL: 'onboarding@resend.dev' }, 600, fixture.transport), { reason: 'configuration' });
+    assert.equal(fixture.calls.length, 0);
   }
 });

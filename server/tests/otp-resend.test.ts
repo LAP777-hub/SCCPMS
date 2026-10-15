@@ -11,10 +11,10 @@ const sessionId = '00000000-0000-4000-8000-000000000002';
 const messageId = '00000000-0000-4000-8000-000000000003';
 const email = 'patient@spu.ac.za';
 const emailHash = otpEmailHash(userId, email)!;
-let originalSettings: Pick<typeof config, 'NODE_ENV' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL' | 'OTP_VALIDITY_SECONDS' | 'OTP_RESEND_COOLDOWN_SECONDS' | 'RESEND_ADMIN_OWNER_EMAIL' | 'RESEND_ADMIN_OWNER_USER_ID'>;
+let originalSettings: typeof config;
 beforeEach(() => {
-  originalSettings = { NODE_ENV: config.NODE_ENV, RESEND_API_KEY: config.RESEND_API_KEY, RESEND_FROM_EMAIL: config.RESEND_FROM_EMAIL, OTP_VALIDITY_SECONDS: config.OTP_VALIDITY_SECONDS, OTP_RESEND_COOLDOWN_SECONDS: config.OTP_RESEND_COOLDOWN_SECONDS, RESEND_ADMIN_OWNER_EMAIL: config.RESEND_ADMIN_OWNER_EMAIL, RESEND_ADMIN_OWNER_USER_ID: config.RESEND_ADMIN_OWNER_USER_ID };
-  Object.assign(config, { NODE_ENV: 'production', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>', OTP_VALIDITY_SECONDS: 600, OTP_RESEND_COOLDOWN_SECONDS: 30, RESEND_ADMIN_OWNER_EMAIL: '', RESEND_ADMIN_OWNER_USER_ID: '' });
+  originalSettings = { ...config };
+  Object.assign(config, { NODE_ENV: 'production', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: '', OTP_VALIDITY_SECONDS: 600, OTP_RESEND_COOLDOWN_SECONDS: 30, RESEND_ADMIN_OWNER_EMAIL: email, RESEND_ADMIN_OWNER_USER_ID: userId, BREVO_API_KEY: '', BREVO_FROM_EMAIL: '' });
 });
 afterEach(() => { Object.assign(config, originalSettings); mock.restoreAll(); });
 
@@ -27,7 +27,7 @@ function response() {
   };
   return { result, res: res as unknown as Response, close() { res.headersSent = true; res.writableEnded = true; } };
 }
-const request = () => ({ auth: { userId, sessionId, email }, body: {} }) as unknown as Request;
+const request = () => ({ auth: { userId, sessionId, email, role: 'admin' }, body: {} }) as unknown as Request;
 const send = otp.stack.find((layer: any) => layer.route?.path === '/send').route.stack.at(-1).handle;
 
 function fixture(failAuditOnce = false) {
@@ -103,6 +103,59 @@ test('the production owner administrator commits its bound sender and provider a
   assert.equal(database.audits, 1);
   assert.ok(result.body.expiresInSeconds >= 599 && result.body.expiresInSeconds <= 600);
   assert.equal(Object.hasOwn(result.body, 'code'), false);
+});
+
+for (const role of ['patient', 'doctor', 'receptionist']) test(`${role} commits Brevo's message reference and database-backed OTP lifetime`, async () => {
+  Object.assign(config, { BREVO_API_KEY: 'xkeysib-test_fixture_' + 'a'.repeat(40), BREVO_FROM_EMAIL: 'SCCPMS <sender.fixture@gmail.com>' });
+  const database = fixture();
+  const reference = '<fixture-accepted@relay.brevo.example>';
+  const provider = mock.method(globalThis, 'fetch', async (input: unknown, init?: RequestInit) => {
+    assert.equal(String(input), 'https://api.brevo.com/v3/smtp/email');
+    const payload = JSON.parse(String(init?.body));
+    assert.deepEqual(payload.to, [{ email }]);
+    assert.equal(payload.headers.idempotencyKey, database.draft?.id);
+    return Response.json({ messageId: reference }, { status: 201 });
+  });
+  const req = request();
+  req.auth!.role = role as 'patient' | 'doctor' | 'receptionist';
+  const result = response();
+  await send(req, result.res);
+  assert.equal(result.result.status, 202);
+  assert.equal(provider.mock.calls.length, 1);
+  assert.equal(database.draft?.delivery_state, 'accepted');
+  assert.equal(database.draft?.provider_message_id, reference);
+  assert.equal(database.draft?.sender_from, config.BREVO_FROM_EMAIL);
+  assert.equal(database.audits, 1);
+  assert.ok(result.result.body.expiresInSeconds >= 599 && result.result.body.expiresInSeconds <= 600);
+});
+
+test('a Brevo IP rejection preserves accepted codes and returns service unavailability, never a login rejection', async () => {
+  Object.assign(config, { BREVO_API_KEY: 'xkeysib-test_fixture_' + 'a'.repeat(40), BREVO_FROM_EMAIL: 'SCCPMS <sender.fixture@gmail.com>' });
+  const database = fixture();
+  const provider = mock.method(globalThis, 'fetch', async () => Response.json({ code: 'unauthorized', message: 'Unrecognised IP address 192.0.2.1' }, { status: 401 }));
+  const req = request(); req.auth!.role = 'patient';
+  const result = response();
+  await send(req, result.res);
+  assert.equal(result.result.status, 503);
+  assert.equal(result.result.body.code, 'OTP_EMAIL_UNAVAILABLE');
+  assert.equal(result.result.body.activeChallenge.expiresAt, database.originalExpiry.toISOString());
+  assert.equal(database.oldConsumed, false);
+  assert.equal(database.draft?.delivery_state, 'failed');
+  assert.equal(database.audits, 0);
+  assert.equal(provider.mock.calls.length, 1);
+  assert.ok(!JSON.stringify(result.result.body).includes('192.0.2.1'));
+});
+
+test('missing Brevo setup never uses Resend or consumes a non-admin challenge budget', async () => {
+  const database = fixture();
+  const provider = mock.method(globalThis, 'fetch', async () => { throw new Error('No fallback is permitted'); });
+  const req = request(); req.auth!.role = 'patient';
+  const result = response();
+  await send(req, result.res);
+  assert.equal(result.result.status, 503);
+  assert.equal(database.draft, null);
+  assert.equal(provider.mock.calls.length, 0);
+  assert.equal(database.audits, 0);
 });
 
 test('an unset primary sender preserves accepted codes without reserving a challenge or contacting Resend', async () => {

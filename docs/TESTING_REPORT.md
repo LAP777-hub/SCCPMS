@@ -1,12 +1,16 @@
 # SCCPMS testing report
 
-**Report date:** 15 October 2026 (Africa/Johannesburg)
+**Report date:** 16 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the account deletion, Records, notifications, live refresh and expanded reports release is published to GitHub and both Vercel projects are READY for application commit `da399a9`. Its completed cloud workflow passed **342 server unit checks with six intentional database skips**, **six separate real database cases**, **99/99 browser cases**, builds and security checks. **7/7 live HTTP checks** passed against the deployed frontend and API. Migrations 024/025 are applied. Section 11h records this release and its test boundaries.
+**Account-operations baseline:** the account deletion, Records, notifications, live refresh and expanded reports release is published to GitHub and both Vercel projects were verified READY for application commit `da399a9`. Its completed cloud workflow passed **342 server unit checks with six intentional database skips**, **six separate real database cases**, **99/99 browser cases**, builds and security checks. **7/7 live HTTP checks** passed against the deployed frontend and API. Migrations 024/025 are applied. Section 11h records this release and its test boundaries.
 
-All valid recipient emails are accepted. The SPU sender plan remains canceled,
-and no replacement sending domain or SMTP account is available yet. General
-invitation, confirmation and OTP delivery therefore remains incomplete. The
+All valid recipient emails are accepted. The SPU sender plan remains canceled.
+Brevo API/SMTP credentials have now been supplied and saved privately. New
+provider routing restricts Resend to the bound administrator and uses Brevo for
+other roles; its local suite passes **373 checks with six intentional skips**.
+Brevo live inspection still returns HTTP401 IP authorisation blocked, so the
+sender, SMTP username, relay and actual delivery remain unverified. General
+invitation, confirmation and non-admin OTP delivery remain incomplete. The
 bound administrator OTP route remains available; its earlier diagnostic email
 was delivered, while a real OTP/login round trip and live clinical acceptance
 are still unverified. Earlier failures and corrections remain recorded below.
@@ -1107,6 +1111,50 @@ live clinical/inbox acceptance remain outstanding; the SPU sender plan remains
 canceled. A successful invitation API/provider acknowledgement is not a promise
 of inbox delivery.
 
+## 11i. Brevo non-admin mail and Resend administrator isolation — 15–16 October 2026
+
+The user supplied Brevo API and SMTP credentials and requested that Resend serve
+only the existing administrator. Keys were saved in ignored configuration and
+the runtime API key in Vercel's Sensitive production environment;
+the encoded MCP credential is not used as an API/SMTP password. No real user
+accounts, clinical records or mail messages were created for this work.
+
+| Check | Observed result and boundary |
+| --- | --- |
+| Initial live Brevo access | Both `GET /v3/account` and `GET /v3/senders` returned **401 IP authorisation blocked**; no sender/relay inspection or SMTP change was possible |
+| Requested IP recheck and later recheck | Both endpoints still returned **401 IP authorisation blocked**; this establishes an access failure, not inbox delay or a confirmed bad key |
+| Focused dispatch/config/resilience checks | **68/68 passed**, zero failures, 3.410s; strict admin identity, six non-admin role variants, Brevo payload/message references, retry identity, safe provider errors and production configuration |
+| OTP route / SMTP helper focused checks | **51/51 passed**, zero failures, 9.916s; provider acknowledgement and SQL lifetime, current-code preservation, no Resend fallback, IP rejection as503, verified-sender/relay/username gates, redirects and templates |
+| Final complete local backend suite | **379 total:373 passed, six intentional opt-in database skips, zero failures**, Node22, **84.444s**; public dummy credentials used throughout |
+| Backend TypeScript and production build | Passed |
+| Credential publication guard | Added raw Brevo API/SMTP and encoded MCP detection, exact active-key checks and three passing negative/placeholder regressions; final indexed scan passed **487 files, zero findings** |
+| Administrative helper live inspection | Safe `brevo_ip_authorization`, HTTP401; no emails sent and Supabase SMTP left unchanged |
+
+Resend now requires the configured owner's exact Auth UUID, trusted admin role
+and normalized email in every environment. Non-admin roles use Brevo only;
+unknown roles, other administrators, recipient overrides, provider overrides
+and incompatible stored senders fail closed. Missing provider setup does not
+consume a new challenge. ProviderIP failures return safe service-unavailable
+responses, not incorrect-password/session errors. The existing database
+single-use code, accepted-only verification, session binding, expiry and attempt
+limits are preserved.
+
+Brevo retries reuse the exact challenge UUID and payload. A duplicate response
+without a message reference remains unknown; it cannot activate a code or
+fabricate an acknowledgement. Such an uncertain draft may remain pending until
+its15-minute lifetime ends. The tests establish controlled provider contracts,
+not guaranteed receipt time during real outages.
+
+The new `auth:configure-brevo` helper performs sender/relay inspection and guarded
+Supabase SMTP/template setup. SMTP username must match the provider account,
+the SMTP key is distinct from the API key, and changes are read back while
+preserving redirects/confirmation. It sends no emails. Real SMTP authentication,
+link tracking, inbox delivery, invitation password setup and multi-role live
+login must still be accepted after Brevo permits the hosting connections.
+The requested IP-policy question remains unresolved; no IP/security setting was
+silently changed. Historical domain/Resend SMTP instructions are superseded by
+[the current Brevo setup](email-delivery.md).
+
 ## 12. Supporting documents
 
 - [Operations](../OPERATIONS.md)
@@ -1119,4 +1167,4 @@ of inbox delivery.
 - [Login session and port diagnostics](session-connectivity.md)
 - [GitHub/Vercel deployment](vercel-deployment.md)
 
-This report is maintained from recorded command results, source inventory and the retained local artifacts. Hosting and cloud database connectivity pass. Pending release gates include a verified replacement sender, custom SMTP and institutional operational acceptance; local university-network instability remains separately documented.
+This report is maintained from recorded command results, source inventory and retained local artifacts. Hosting and cloud database connectivity pass. Pending email gates are Brevo API/SMTP IP access, verified sender/relay/SMTP settings and real inbox acceptance. Institutional operational acceptance and local university-network instability remain separately documented.

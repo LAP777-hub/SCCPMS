@@ -66,19 +66,25 @@ Set these variables on the **API** project's Production environment:
 | `OTP_HMAC_SECRET` | A securely generated random secret of at least 32 characters, consistent across all API instances |
 | `OTP_VALIDITY_SECONDS` | `600`: code validity from provider acceptance; permitted range 120–900 |
 | `OTP_RESEND_COOLDOWN_SECONDS` | `30`: minimum interval after accepted sending; permitted range 30–300 |
-| `RESEND_API_KEY` | The full Resend sending key |
-| `RESEND_FROM_EMAIL` | Intentionally unset or empty until a replacement custom-domain sender is verified and enabled for sending; empty production setting requires the complete owner-admin binding below |
-| `RESEND_ADMIN_OWNER_EMAIL` | Optional temporary Resend owner email, bound to the existing confirmed administrator; configure together with its Auth ID |
-| `RESEND_ADMIN_OWNER_USER_ID` | Optional exact Auth UUID for that administrator; owner-only OTP route never applies to other accounts |
+| `RESEND_API_KEY` | Full sending key for the bound administrator OTP route only |
+| `RESEND_FROM_EMAIL` | Leave empty; this legacy setting never enables general Resend delivery |
+| `RESEND_ADMIN_OWNER_EMAIL` | Resend owner email, bound to the existing confirmed administrator; configure together with its Auth ID |
+| `RESEND_ADMIN_OWNER_USER_ID` | Exact Auth UUID for that administrator; never applies to another account |
+| `BREVO_API_KEY` | Full Brevo API key for non-admin login OTPs; store as Sensitive |
+| `BREVO_FROM_EMAIL` | Active verified Brevo sender, such as `SCCPMS <your-verified-sender@example.com>` |
 
 Vercel supplies `VERCEL=1` automatically. `PORT` is for the local server and does not select the hosted API URL. Store backend secrets in the API project's environment settings, not source files or frontend variables. Optional Photon address-search settings are documented in `server/.env.example`.
 
-Deploy the API source that permits a blank primary sender with a complete valid
-owner binding before removing its former `RESEND_FROM_EMAIL` Vercel variable.
-Redeploy after the environment change. Keep both owner settings private and
-configured together. This permits only the configured confirmed administrator's
-real OTP delivery; all other accounts fail safely until a replacement sender is
-verified. Never set `onboarding@resend.dev` as a global production sender.
+Keep both owner settings private and configured together, even after adding
+Brevo. Non-admin roles use Brevo exclusively; there is no provider fallback.
+The runtime does not need Brevo's SMTP password or the Supabase management token.
+Configure those only in the administrative environment, then use
+`npm run auth:configure-brevo --prefix server -- --apply-smtp` and
+`--apply-templates` after read-only inspection succeeds. Standard Vercel egress
+and Supabase SMTP sources must satisfy Brevo's separate API/SMTP IP policies.
+Current live inspection is blocked by Brevo IP authorisation; general delivery
+is not ready. See [email setup](email-delivery.md). Never enable the Resend test
+sender globally or disable confirmation to bypass an email failure.
 
 Copy **Transaction pooler** from Supabase's Connect dialog. Its form is:
 

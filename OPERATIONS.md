@@ -28,64 +28,47 @@ connectivity and performs no account changes or email delivery. See
 [the session and port diagnostic guide](docs/session-connectivity.md), including
 the recorded university-network connection incident and required outbound ports.
 
-## Resend email OTP
+## Email providers and SMTP
 
-Set the full `RESEND_API_KEY` in the ignored `server/.env` or hosting secret
-manager. Never put it in a `VITE_` variable. A masked token in an API-key CSV
-export cannot authenticate and must not be saved as a working key. The supplied
-full key has now been installed and accepted by Resend's read-only domain API.
-Development can start without a key; requesting a code fails safely until
-delivery is configured. Restart the API after changing its environment file.
+Resend sends login OTPs only to the configured owner administrator. Keep the
+full RESEND_API_KEY, RESEND_ADMIN_OWNER_EMAIL and RESEND_ADMIN_OWNER_USER_ID
+private and configured together. The exact trusted role, UUID and normalized
+email must match; the fixed default sender is never enabled for another user.
+Leave RESEND_FROM_EMAIL empty. Keep this route when adding Brevo.
 
-The primary sender is intentionally unset until a replacement custom domain is
-verified. Leave `RESEND_FROM_EMAIL` unset or empty. Production requires a full
-key and either a valid custom sender or the complete temporary owner-admin
-binding. `RESEND_ADMIN_OWNER_EMAIL` and `RESEND_ADMIN_OWNER_USER_ID` must identify
-the existing confirmed, active administrator and the Resend account email.
-Only that exact account can receive a real OTP from
-`SCCPMS <onboarding@resend.dev>`; no global test sender is enabled. Other accounts
-receive a safe delivery-unavailable response while the primary sender is empty.
-For general delivery, set `RESEND_FROM_EMAIL` to a mailbox at a custom domain you
-own and have verified in Resend. Recipients may use any valid email domain.
-See [Resend test-domain restrictions](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain)
-and [domain verification](https://resend.com/docs/dashboard/domains/introduction).
+Brevo sends login OTPs for all supported non-admin roles using BREVO_API_KEY and
+BREVO_FROM_EMAIL. Supabase confirmation, invitation and recovery messages use
+Brevo SMTP after setup. A verified individual Brevo sender may use a personal
+mailbox; school DNS is not required. Sender verification, account activation,
+provider quotas and inbox filtering still apply.
 
-The SPU sender setup was canceled on **14 October 2026**. The earlier
-`clinic.spu.ac.za` domain was prepared but remained unverified; university DNS
-was not changed. [RESEND_UNIVERSITY_DNS.md](RESEND_UNIVERSITY_DNS.md) preserves
-that historical handoff. Do not configure its address as the active sender or
-run the university preparation command as a required setup step. The handoff
-can be reconsidered only if that domain is separately approved and verified.
-No replacement provider or verified sender is configured by canceling SPU.
+Current live account/sender inspection returns HTTP401 IP authorisation blocked.
+SMTP username, active sender and relay status cannot yet be verified. Brevo API
+and SMTP have separate IP policies. Approving a local computer alone does not
+establish access from Vercel or Supabase. General mail is not ready while this
+external blocker remains; no OTP/confirmation checks are bypassed.
 
-```sh
-npm run email:check --prefix server
-npm run email:check --prefix server -- --production
-```
+Use Node22 and ignored server/.env for administrative SMTP credentials:
 
-This native Node checker performs only authenticated `GET /domains` requests and
-prints configuration/status categories. It checks the exact sender domain is
-verified and enabled for sending; it never sends an email or prints keys, OTPs,
-recipient addresses or provider payloads. A sending-only key cannot read domains,
-so use the Resend dashboard or a domain-readable key for this administrative check.
-The API can keep a restricted sending key for runtime delivery. This general
-sender check remains unavailable while the primary sender is empty; it does not
-measure delivery through the separate owner-admin route.
-[Domain API](https://resend.com/docs/api-reference/domains/list-domains),
-[API-key permissions](https://resend.com/docs/api-reference/api-keys/create-api-key).
+~~~sh
+npm run auth:configure-brevo --prefix server -- --inspect
+npm run auth:configure-brevo --prefix server -- --apply-smtp
+npm run auth:configure-brevo --prefix server -- --apply-templates
+~~~
 
-A successful domain check does not establish inbox delivery. Complete the login
-flow with an authorized account and the actually received code before accepting
-the email channel for live use. Read-only checks do not send messages.
+The helper checks active sender and relay, verifies the SMTP username belongs
+to the account, uses the distinct SMTP key and reads back saved settings. It
+preserves existing redirect entries, keeps confirmation on and sends no email.
+The runtime API needs only Brevo API credentials; SMTP credentials and the
+Supabase management token are administrative secrets. Deploy after runtime
+configuration changes. Disable link tracking for Auth mail and verify real
+messages before accepting onboarding.
 
-Supabase sends account invitations, confirmation and password-recovery emails
-through its Auth configuration. Use the separate guarded configuration runner
-for production templates and Resend SMTP on port 465. It verifies the sender
-before changing SMTP and preserves existing redirects. Custom SMTP is currently
-absent. Supabase's default service sends only to project-team addresses; accepting
-any valid email in the application does not remove that provider restriction.
-Configure the verified replacement sender before general onboarding.
-[Email setup, timing and live acceptance](docs/email-delivery.md).
+Login codes last ten minutes after provider acknowledgement. Failed resends
+preserve an existing valid code. Calls have a ten-second budget and reuse their
+challenge idempotency key. An unknown delivery is never reported as activated.
+See [provider setup, exact keys and required live acceptance](docs/email-delivery.md).
+The canceled SPU/Resend DNS plan is historical; do not reinstate its sender.
 
 ## Roles and clinic workflows
 

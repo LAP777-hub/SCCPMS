@@ -12,6 +12,7 @@
     "auth:check-redirects": "node scripts/auth-redirect-settings.mjs",
     "auth:configure-redirects": "node scripts/auth-redirect-settings.mjs --apply",
     "auth:configure-email": "node scripts/configure-auth-email.mjs",
+    "auth:configure-brevo": "node scripts/configure-brevo-email.mjs",
     "connections:check": "node scripts/check-connections.mjs",
     "test": "node --import tsx --test --test-concurrency=1 tests/*.test.ts",
     "test:database": "node --import tsx tests/run-database-tests.ts",
