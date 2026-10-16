@@ -2,7 +2,7 @@
 
 **Report date:** 16 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the completed Brevo/Resend implementation is published at application commit `255e535`, and both Vercel projects were verified READY for that commit. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38836967389) passed **374 server checks with six intentional unit-command database skips**, **six separate real PostgreSQL cases**, **99 browser cases**, builds, typechecks and security checks. **7/7 deployed HTTP checks** and **8/8 live desktop/mobile email-wrapper checks** passed. Brevo API and Supabase SMTP test messages both reported delivered. Existing account/Records/report workflows and migrations 024/025 remain in place; migration 026 completes the provider cutover. Sections 11h–11j distinguish those releases and remaining acceptance work.
+**Status:** the completed registration, residence search, staff popup and profile-photo release is published at application commit `27d2cfa`, and both Vercel projects were verified READY for that exact commit. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38906863196) passed **394 server checks with six intentional unit-command database skips**, **six separate real PostgreSQL cases**, **114 browser cases**, builds, typechecks and security checks. **9/9 deployed HTTP checks** and **10/10 live address searches** passed. Earlier **8/8 live desktop/mobile email-wrapper checks** and two delivered Brevo API/Supabase SMTP setup messages remain separate evidence. Migrations 027/028 are applied; login OTP lifetime is exactly five minutes. Sections 11h–11k preserve release history, failed attempts, corrections and remaining real-user acceptance work.
 
 All valid recipient emails are accepted. The SPU sender plan remains canceled.
 Brevo API/SMTP credentials have now been supplied and saved privately. New
@@ -50,11 +50,11 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest completed cloud server unit run | **380 total: 374 passed, 6 skipped, 0 failed** | Node 22; six real database cases opt in; final workflow for `255e535`, 56.776s |
+| Latest completed cloud server unit run | **400 total: 394 passed, 6 skipped, 0 failed or cancelled** | Node 22; six real database cases opt in; final workflow for `27d2cfa`, 58.685s |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI for `255e535`, 3.273s; includes all-role deletion/history, provider cutover, OTP timing/recovery, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
+| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed or cancelled** | GitHub Linux/PostgreSQL CI for `27d2cfa`, 3.083s; includes all-role deletion/history, provider cutover, five-minute OTP migration, profile persistence/constraints, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -64,7 +64,8 @@ These are completed results available when this report was assembled. Counts fro
 | Latest invitation modal/menu checks | Passed | 320×640 modal and all four menu ARIA states; see section 6 |
 | Final circular auth logo check | **4 browser views passed** | Login/registration at 320×640 and 1366×768; loaded 50% border radius, square 104/156px geometry, no overflow or runtime errors |
 | Earlier runtime smoke | Passed at that milestone | API/database health 200, frontend 200, unauthenticated protected API 401; superseded by the current connection incident below |
-| Deployed runtime connectivity | **Passed: frontend/API/database health 200** | Seven live HTTP checks pass; campus-network failures remain historical/local evidence in sections 11b/11d |
+| Deployed runtime connectivity | **9/9 live HTTP checks passed** | Frontend/API/database health 200; invitation callback, protected GET/POST/PUT rejection, production CORS and JSON404; campus-network failures remain historical/local evidence in sections 11b/11d |
+| Live Kimberley address/residence searches | **10/10 passed** | Real Long Street/New Park coordinates plus eight catalogue/alias results; catalogue-only names retain null coordinates and manual entry |
 | Hosted development redirect routing | Passed | Saved/read back 5173; default/signup/invite/recovery HTTP 303 probes resolve to the development frontend |
 | Resend key/domain API | Passed key acceptance | Authenticated read-only domain lookup succeeded; this is not delivery acceptance |
 | Former university sending domain | **Canceled; historical setup only** | `clinic.spu.ac.za` was prepared but unverified; the active verified Brevo sender now supports general delivery |
@@ -74,7 +75,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **99 passed, 0 failed** | GitHub Linux CI for `255e535`, 1.6 minutes; Records/deletion/reinvite, reports/mobile plots, cross-role mocked live refresh and existing email/registration/session checks |
+| Latest full browser run | **114 passed, 0 failed** | GitHub Linux CI for `27d2cfa`, 1.8 minutes; Records popup/deletion/reinvite, reports/mobile plots, cross-role mocked live refresh, five-minute OTP, signup/invitation callbacks, calling codes, residence fallback and all-role photo upload/reload |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -1239,6 +1240,12 @@ on Resend; non-admin codes and hosted Auth SMTP remain on Brevo.
 | Lint | Initial unused receptionist Avatar helper removed; rerun passed with zero errors. The existing Fast Refresh warning and `.eslintignore` notice remain |
 | Typechecks/builds | Frontend/backend typechecks and production builds passed; frontend fixture build16.78s |
 | Final fixture frontend build | Passed after phone correction, 20.42s; final lint/typechecks passed |
+| Final publication scan | **506 indexed files, zero findings**; provider credentials, private environments and diagnostic data remain outside Git |
+| Final cloud regression | Exact application commit `27d2cfa`: **400 total / 394 server passes / six intentional unit-command skips / zero failures or cancellations**, 58.685s; separate real PostgreSQL **6/6**, 3.083s; browser **114/114**, 1.8 minutes; frontend/backend builds, typechecks and security scan passed |
+| Final Vercel application release | Both frontend and API verified READY for exact commit `27d2cfa2cb4d2169b0ac2d1266ed3c8eec97e65d`; five-minute OTP setting and private profile bucket configured |
+| Final live HTTP checks | **9/9 passed**, 16 October at15:21SAST: frontend, invitation callback route, API root, PostgreSQL health, protected photo GET/PUT and OTP POST rejection, production CORS and JSON404 |
+| Final live address searches | **10/10 passed**, 16 October at15:22SAST: Long Street and New Park returned real map coordinates; Rathaga, Massouh, Rise Student Living, Long Street Lofts, My Studend SA, Sea Of Mountains, Ntabiseng Courts and Lawson resolved through the expected catalogue source without invented coordinates |
+| Deployed frontend assets | **4/4 passed**, 16 October at15:22SAST: production script loaded and contains the profile-photo workflow, calling-code control and correct production API origin |
 
 Search combines the seven university halls and sixteen published off-campus
 names/clusters with the administrator's Ntabiseng Courts/Lawson additions and
@@ -1248,8 +1255,11 @@ own-user API and real Storage, not browser-only persistence. The invitation
 popup preserves validated callback/session gates and chosen-password login.
 
 The one-minute mail target remains dependent on provider and recipient delivery.
-Final hosted source/deployment and cloud regression results are recorded after
-publication; live human signup/invitation/OTP completion remains acceptance work.
+The cloud checks and live searches above passed for the published
+[application commit](https://github.com/LAP777-hub/SCCPMS/commit/27d2cfa2cb4d2169b0ac2d1266ed3c8eec97e65d)
+and [successful workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38906863196).
+Live human signup/invitation/OTP completion remains acceptance work. This final
+evidence update changes documentation only.
 
 ## 12. Supporting documents
 
