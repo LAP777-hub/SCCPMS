@@ -42,6 +42,10 @@ export async function inspectBrevoEmail(settings, fetcher = fetch) {
     activeSenderCount:senders.senders.filter(item=>item.active===true).length};
 }
 const smtpFields = ['smtp_host','smtp_port','smtp_user','smtp_pass','smtp_admin_email','smtp_sender_name','smtp_max_frequency','rate_limit_email_sent'];
+// Supabase's hosted SMTP password is write-only. GET can return an opaque
+// secret marker instead of the password. Verify the PATCH acknowledgement and
+// presence separately; actual credentials require a real SMTP/Auth mail check.
+function smtpPasswordStored(value) { return typeof value === 'string' && value.length > 0; }
 export async function configureBrevoEmail(settings, mode = 'inspect', fetcher = fetch) {
   if (!['inspect','apply-smtp','apply-templates'].includes(mode)) throw new BrevoSetupError('unsupported_operation');
   const gate = await inspectBrevoEmail(settings, fetcher);
@@ -54,7 +58,8 @@ export async function configureBrevoEmail(settings, mode = 'inspect', fetcher = 
   if (typeof current.site_url !== 'string' || typeof current.uri_allow_list !== 'string') throw new BrevoSetupError('management_invalid_response');
   const summary = value => ({siteUrl:new URL(value.site_url).origin, smtpConfigured:Boolean(value.smtp_host && value.smtp_user && value.smtp_pass),
     brevoSmtpConfigured:value.smtp_host==='smtp-relay.brevo.com', senderMatches:value.smtp_admin_email===address(settings.fromEmail),
-    smtpKeyMatches:Boolean(settings.smtpPassword && value.smtp_pass===settings.smtpPassword), authLinkExpirySeconds:value.mailer_otp_exp});
+    smtpPasswordStored:smtpPasswordStored(value.smtp_pass), smtpKeyMatches:value.smtp_pass===settings.smtpPassword ? true : null,
+    smtpPasswordWriteOnly:smtpPasswordStored(value.smtp_pass) && value.smtp_pass!==settings.smtpPassword, authLinkExpirySeconds:value.mailer_otp_exp});
   if (mode === 'inspect') return {operation:mode,status:'inspected',...summary(current),gate};
   if (!gate.ready) return {operation:mode,status:'blocked',reason:'brevo_sender_relay_or_smtp_credentials_not_ready',gate};
   let patch;
@@ -64,7 +69,7 @@ export async function configureBrevoEmail(settings, mode = 'inspect', fetcher = 
       smtp_admin_email:address(settings.fromEmail),smtp_sender_name:'SCCPMS',smtp_max_frequency:30,
       rate_limit_email_sent:Math.max(Number.isSafeInteger(current.rate_limit_email_sent)?current.rate_limit_email_sent:0,30),mailer_autoconfirm:false};
   } else {
-    if (current.smtp_host!=='smtp-relay.brevo.com' || current.smtp_pass!==settings.smtpPassword || current.smtp_user!==settings.smtpUsername
+    if (current.smtp_host!=='smtp-relay.brevo.com' || !smtpPasswordStored(current.smtp_pass) || current.smtp_user!==settings.smtpUsername
       || current.smtp_admin_email!==address(settings.fromEmail)) return {operation:mode,status:'blocked',reason:'matching_brevo_smtp_required'};
     patch = buildTemplatePatch(current,settings.frontendOrigin);
   }
@@ -76,10 +81,11 @@ export async function configureBrevoEmail(settings, mode = 'inspect', fetcher = 
     saved = await request(endpoint,headers,fetcher);
     const preserved = mode==='apply-smtp' ? saved.site_url===current.site_url && saved.uri_allow_list===current.uri_allow_list
       : smtpFields.every(key=>saved[key]===current[key]);
-    if(preserved && Object.entries(patch).every(([key,value])=>saved[key]===value)) {verified=true;break;}
+    if(preserved && Object.entries(patch).every(([key,value])=>key==='smtp_pass' ? smtpPasswordStored(saved[key]) : saved[key]===value)) {verified=true;break;}
   }
   if(!verified) throw new BrevoSetupError('management_readback_mismatch');
-  return {operation:mode,status:changed?'applied':'unchanged',...summary(saved),verified:true,existingRedirectsPreserved:true};
+  return {operation:mode,status:changed?'applied':'unchanged',...summary(saved),verified:true,existingRedirectsPreserved:true,
+    ...(mode==='apply-smtp'?{smtpPasswordWriteAcknowledged:changed}: {})};
 }
 async function main() {
   const args=process.argv.slice(2);

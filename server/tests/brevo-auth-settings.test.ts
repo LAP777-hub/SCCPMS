@@ -8,7 +8,7 @@ const settings = {
   smtpUsername:'fixture@smtp-brevo.com',smtpPassword:'xsmtpsib-test_fixture_'+'b'.repeat(40),
   supabaseUrl:'https://fixtureproject.supabase.co',managementToken:'sbp_test_fixture_management_only',frontendOrigin:'https://clinic.fixture.co.za',
 };
-function fixture(changes: { active?: boolean; relay?: boolean; rejected?: boolean; ignorePatch?: boolean } = {}) {
+function fixture(changes: { active?: boolean; relay?: boolean; rejected?: boolean; ignorePatch?: boolean; writeOnlySecret?: boolean } = {}) {
   let current: Record<string, unknown> = {site_url:settings.frontendOrigin,uri_allow_list:'http://localhost:5173,https://clinic.fixture.co.za/',mailer_otp_exp:7200,mailer_autoconfirm:false,rate_limit_email_sent:2};
   const patches: Record<string, unknown>[]=[];
   const requests: string[]=[];
@@ -27,7 +27,7 @@ function fixture(changes: { active?: boolean; relay?: boolean; rejected?: boolea
       const patch=JSON.parse(String(init.body));patches.push(patch);
       if(!changes.ignorePatch) current={...current,...patch};
     }
-    return Response.json(current);
+    return Response.json(changes.writeOnlySecret && current.smtp_pass ? {...current,smtp_pass:'a'.repeat(64)} : current);
   };
   return {fetcher,patches,requests,get current(){return current;}};
 }
@@ -57,6 +57,21 @@ test('Brevo SMTP uses its SMTP key and verified sender while preserving redirect
   assert.equal(provider.current.uri_allow_list,originalRedirects);
   assert.equal(provider.current.site_url,settings.frontendOrigin);
   assert.ok(!JSON.stringify(result).includes(settings.smtpPassword));
+});
+
+test('write-only hosted SMTP password readback verifies the acknowledged write and preserves templates', async () => {
+  const provider=fixture({writeOnlySecret:true});
+  const smtp=await configureBrevoEmail(settings,'apply-smtp',provider.fetcher);
+  assert.equal(smtp.verified,true);
+  assert.equal(smtp.smtpPasswordWriteAcknowledged,true);
+  assert.equal(smtp.smtpPasswordStored,true);
+  assert.equal(smtp.smtpPasswordWriteOnly,true);
+  assert.equal(smtp.smtpKeyMatches,null, 'an opaque marker cannot prove an exact password match');
+  assert.equal(provider.current.smtp_pass,settings.smtpPassword);
+  const templates=await configureBrevoEmail(settings,'apply-templates',provider.fetcher);
+  assert.equal(templates.verified,true);
+  assert.equal(provider.current.smtp_pass,settings.smtpPassword);
+  assert.ok(!JSON.stringify(smtp).includes(settings.smtpPassword));
 });
 
 for(const changes of [{active:false},{relay:false}]) test(`unready Brevo ${Object.keys(changes)[0]} blocks SMTP changes`,async()=>{

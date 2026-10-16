@@ -2,15 +2,17 @@
 
 **Report date:** 16 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Account-operations baseline:** the account deletion, Records, notifications, live refresh and expanded reports release is published to GitHub and both Vercel projects were verified READY for application commit `da399a9`. Its completed cloud workflow passed **342 server unit checks with six intentional database skips**, **six separate real database cases**, **99/99 browser cases**, builds and security checks. **7/7 live HTTP checks** passed against the deployed frontend and API. Migrations 024/025 are applied. Section 11h records this release and its test boundaries.
+**Status:** the Brevo/Resend routing implementation is published at application commit `418028c`, and both Vercel projects were verified READY for that commit. Its cloud workflow passed **373 server checks with six intentional unit-command database skips**, **six separate real PostgreSQL cases**, **99 browser cases**, builds, typechecks and security checks. **7/7 deployed HTTP checks** passed. Existing account/Records/report workflows and migrations 024/025 remain in place. Sections 11h/11i distinguish those releases and remaining email acceptance.
 
 All valid recipient emails are accepted. The SPU sender plan remains canceled.
 Brevo API/SMTP credentials have now been supplied and saved privately. New
 provider routing restricts Resend to the bound administrator and uses Brevo for
-other roles; its local suite passes **373 checks with six intentional skips**.
-Brevo live inspection still returns HTTP401 IP authorisation blocked, so the
-sender, SMTP username, relay and actual delivery remain unverified. General
-invitation, confirmation and non-admin OTP delivery remain incomplete. The
+other roles; local and cloud validation passed.
+Brevo's initial HTTP401 IP block was subsequently resolved. Its active sender,
+relay and SMTP credentials are verified; Supabase SMTP and live templates are
+installed. An API diagnostic and actual Supabase recovery email were accepted
+in 634ms/716ms and both reported delivered. Section 11j records this restoration,
+the write-only-password checker correction and migration 026. The
 bound administrator OTP route remains available; its earlier diagnostic email
 was delivered, while a real OTP/login round trip and live clinical acceptance
 are still unverified. Earlier failures and corrections remain recorded below.
@@ -48,11 +50,11 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest completed cloud server unit run | **348 total: 342 passed, 6 skipped, 0 failed** | Node 22; six real database cases opt in; account operations workflow for `da399a9`, 57.116s |
+| Latest completed cloud server unit run | **379 total: 373 passed, 6 skipped, 0 failed** | Node 22; six real database cases opt in; provider-routing workflow for `418028c`, 56.173s |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI for `da399a9`, 3.410s; includes all-role deletion/history, OTP timing/recovery, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
+| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed** | GitHub Linux/PostgreSQL CI for `418028c`, 3.024s; includes all-role deletion/history, OTP timing/recovery, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -71,7 +73,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **99 passed, 0 failed** | GitHub Linux CI for `da399a9`, 1.2 minutes; Records/deletion/reinvite, reports/mobile plots, cross-role mocked live refresh and existing email/registration/session checks |
+| Latest full browser run | **99 passed, 0 failed** | GitHub Linux CI for `418028c`, 1.3 minutes; Records/deletion/reinvite, reports/mobile plots, cross-role mocked live refresh and existing email/registration/session checks |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -1129,12 +1131,15 @@ accounts, clinical records or mail messages were created for this work.
 | Backend TypeScript and production build | Passed |
 | Credential publication guard | Added raw Brevo API/SMTP and encoded MCP detection, exact active-key checks and three passing negative/placeholder regressions; final indexed scan passed **487 files, zero findings** |
 | Administrative helper live inspection | Safe `brevo_ip_authorization`, HTTP401; no emails sent and Supabase SMTP left unchanged |
+| Cloud unit/database/browser checks | Commit `418028c`: **379 total / 373 unit passes / six intentional skips / zero failures**, 56.173s; separate **6/6 real database passes**, 3.024s; **99/99 browser passes**, 1.3 minutes; builds/typechecks/security jobs passed |
+| Vercel source deployment | Both frontend and API verified READY for exact commit `418028c22ffd874a94368650bf0dfb3c3c541539`; Brevo API key stored as Sensitive, no unverified sender configured |
+| Deployed read-only checks | **7/7 passed**, 16 October at00:07SAST: frontend/configuration, invitation callback, API root, PostgreSQL/TLS health, protectedGET/POST rejection, CORS and JSON404 |
 
 Resend now requires the configured owner's exact Auth UUID, trusted admin role
 and normalized email in every environment. Non-admin roles use Brevo only;
 unknown roles, other administrators, recipient overrides, provider overrides
 and incompatible stored senders fail closed. Missing provider setup does not
-consume a new challenge. ProviderIP failures return safe service-unavailable
+consume a new challenge. Provider IP failures return safe service-unavailable
 responses, not incorrect-password/session errors. The existing database
 single-use code, accepted-only verification, session binding, expiry and attempt
 limits are preserved.
@@ -1142,7 +1147,7 @@ limits are preserved.
 Brevo retries reuse the exact challenge UUID and payload. A duplicate response
 without a message reference remains unknown; it cannot activate a code or
 fabricate an acknowledgement. Such an uncertain draft may remain pending until
-its15-minute lifetime ends. The tests establish controlled provider contracts,
+its 15-minute lifetime ends. The tests establish controlled provider contracts,
 not guaranteed receipt time during real outages.
 
 The new `auth:configure-brevo` helper performs sender/relay inspection and guarded
@@ -1151,9 +1156,50 @@ the SMTP key is distinct from the API key, and changes are read back while
 preserving redirects/confirmation. It sends no emails. Real SMTP authentication,
 link tracking, inbox delivery, invitation password setup and multi-role live
 login must still be accepted after Brevo permits the hosting connections.
-The requested IP-policy question remains unresolved; no IP/security setting was
-silently changed. Historical domain/Resend SMTP instructions are superseded by
+At this initial milestone IP access was unresolved. Section 11j records the later
+successful recheck and configuration. No IP/security setting was silently
+changed by the setup scripts. Historical domain/Resend SMTP instructions are superseded by
 [the current Brevo setup](email-delivery.md).
+
+Published [application commit](https://github.com/LAP777-hub/SCCPMS/commit/418028c22ffd874a94368650bf0dfb3c3c541539)
+and [successful cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38814706084).
+This final result update changes documentation only. Passing hosting checks do
+not establish Brevo inbox delivery at that milestone; see the subsequent
+actual delivery evidence below.
+
+## 11j. Brevo access restored, SMTP enabled and real delivery — 16 October 2026
+
+The continuation recheck returned 200 from both Brevo account/sender endpoints.
+One active sender, an enabled transactional relay and its SMTP username were
+discovered and saved privately. Runtime API key and sender are Sensitive Vercel
+production settings; SMTP credentials remain administrative secrets.
+
+| Check | Actual result |
+| --- | --- |
+| Access after initial IP failures | Account and sender requests both **200**, relay enabled, sender active and username matched; no provider IP-security switch changed by these scripts |
+| Real SMTP authentication | **Passed**, verified TLS on port 465; **1.086s**, no email sent by this authentication-only check |
+| Cutover review finding | An older unknown Resend draft could cross providers if its sender exactly matched Brevo's sender; migration 026 retires only unacknowledged pending non-admin drafts |
+| Real isolated SQL cutover regression | **1/1 passed**, no skips, **41.678s**; 11 synthetic controls cover retirement, admin/accepted/known-ack preservation, unchanged verified sessions, audit attribution and idempotency |
+| Production migration 026 | Applied under the migration lock, version ledger and retired-draft state verified; no emails, account credentials or clinical records changed |
+| Initial SMTP settings readback | Failed with `management_readback_mismatch` after a successful update: Supabase returns a write-only SMTP secret marker rather than the plaintext password |
+| Corrected settings helper | Verifies successful password-write acknowledgement and stored presence separately from nonsecret field equality; exact password match is not claimed for opaque readback; **9/9 focused tests passed**, 1.237s |
+| SMTP and templates | Applied/read back: Brevo host/587, username/sender, password stored, confirmation enabled, live Site URL, existing redirects retained and 7200-second Auth links |
+| Real Brevo API diagnostic | **201 accepted in 634ms**, sent only to the confirmed owner administrator; contains no login code; provider events reported **delivered** |
+| Real Supabase SMTP recovery diagnostic | **200 accepted in 716ms**, same confirmed owner; provider events reported **delivered**; reset token was not redeemed or used to change credentials |
+| Delivered email redirect inspection | Initial direct-href check did not find the wrapper because Brevo tracked the link. A manual tracking redirect resolved to the live wrapper, correct Supabase verification origin/path, recovery action and live password-setup callback. No verification URL was requested or token printed/consumed |
+| Updated backend TypeScript | Passed |
+| Final publication scan | **488 indexed files, zero findings**; credentials, private environment and email-link data remain outside Git |
+
+Two actual setup emails were sent in this stage; no patient/doctor/receptionist
+accounts or fictional clinical records were created. The successful SMTP Auth
+request establishes delivery from Supabase's hosted service, beyond a local
+SMTP login. Provider “delivered” events do not establish that the recipient read
+the message, its inbox folder or a universal delivery-time guarantee.
+
+The preserved administrator login OTP still uses Resend. Non-admin OTP dispatch
+uses Brevo, with confirmations/invitations/recovery through Supabase SMTP.
+Actual signup, staff invitation password completion and OTP entry with real
+authorized users remain acceptance work; automated role flows use fixtures.
 
 ## 12. Supporting documents
 
@@ -1167,4 +1213,4 @@ silently changed. Historical domain/Resend SMTP instructions are superseded by
 - [Login session and port diagnostics](session-connectivity.md)
 - [GitHub/Vercel deployment](vercel-deployment.md)
 
-This report is maintained from recorded command results, source inventory and retained local artifacts. Hosting and cloud database connectivity pass. Pending email gates are Brevo API/SMTP IP access, verified sender/relay/SMTP settings and real inbox acceptance. Institutional operational acceptance and local university-network instability remain separately documented.
+This report is maintained from recorded command results, source inventory and retained local artifacts. Hosting/database connectivity, Brevo access, sender/relay, SMTP credentials and actual API/Supabase SMTP delivery checks pass. Real recipient signup/invitation/OTP completion and institutional operational acceptance remain outstanding; local university-network instability is separately documented.

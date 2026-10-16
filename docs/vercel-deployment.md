@@ -82,8 +82,9 @@ Configure those only in the administrative environment, then use
 `npm run auth:configure-brevo --prefix server -- --apply-smtp` and
 `--apply-templates` after read-only inspection succeeds. Standard Vercel egress
 and Supabase SMTP sources must satisfy Brevo's separate API/SMTP IP policies.
-Current live inspection is blocked by Brevo IP authorisation; general delivery
-is not ready. See [email setup](email-delivery.md). Never enable the Resend test
+The earlier Brevo IP block is resolved for the checked connections. Its active
+sender, SMTP credentials and Supabase delivery are verified; both runtime
+Brevo settings are Sensitive production variables. See [email setup](email-delivery.md). Never enable the Resend test
 sender globally or disable confirmation to bypass an email failure.
 
 Copy **Transaction pooler** from Supabase's Connect dialog. Its form is:
@@ -98,7 +99,7 @@ Keep certificate verification enabled. The API bundles the Supabase root CA, wit
 
 On Vercel, cross-instance updates use the durable database change log and bounded SSE: streams check for changes every two seconds, last up to 50 seconds, and recheck authentication every 15 seconds before reconnecting. Persistent PostgreSQL `LISTEN` is disabled in that runtime. **Only port 6543 is required for Vercel clinic queries.** `DATABASE_EVENTS_URL` on port 5432 belongs to local or other persistent hosting that uses `LISTEN`; omit it from Vercel. A 15-second browser read fallback keeps dashboard data current when the event stream cannot connect.
 
-Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates, `021_shared_request_limits.sql` for shared request/address-provider budgets, `022_otp_delivery_timing.sql` for pending/accepted OTP timing and safe resends, `023_otp_sender_binding.sql` for retries using the saved sender, `024_account_records_invitations.sql` for retained-account replacement links and invitation tracking, and `025_existing_invitation_state.sql` for the state of existing provider invitations.
+Apply all versioned `server/sql/` migrations using a trusted administrative environment before accepting traffic. The Vercel runtime additionally relies on `020_serverless_clinic_events.sql` for durable updates, `021_shared_request_limits.sql` for shared request/address-provider budgets, `022_otp_delivery_timing.sql` for pending/accepted OTP timing and safe resends, `023_otp_sender_binding.sql` for retries using the saved sender, `024_account_records_invitations.sql` for retained-account replacement links and invitation tracking, and `025_existing_invitation_state.sql` for existing provider invitations. Apply `026_retire_legacy_nonadmin_otp_drafts.sql` before enabling Brevo: it prevents an old unconfirmed draft from crossing providers even with an identical sender, while preserving accepted codes, known acknowledgements and administrator drafts.
 
 ```sh
 npm ci --prefix server

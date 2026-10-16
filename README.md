@@ -9,7 +9,7 @@ For GitHub-to-Vercel deployment, use [the deployment guide](docs/vercel-deployme
 | Frontend | Reuse `sccpms` | Repository root (`.`) | Vite: `npm run build`, output `dist` |
 | API | `sccpms-api` | `server` | Express: `npm run build` |
 
-The live frontend is [sccpms.vercel.app](https://sccpms.vercel.app); the live API is [sccpms-api.vercel.app](https://sccpms-api.vercel.app), with a passing [database health check](https://sccpms-api.vercel.app/healthz). Both deploy automatically from this repository's `main` branch and have separate environment variables and `vercel.json`. [Testing results and failure history](docs/TESTING_REPORT.md) distinguish local, cloud, browser and real database checks. General email setup is currently blocked by Brevo IP authorisation; sender, SMTP and inbox acceptance remain required before clinic use. The bound owner administrator retains its Resend OTP route.
+The live frontend is [sccpms.vercel.app](https://sccpms.vercel.app); the live API is [sccpms-api.vercel.app](https://sccpms-api.vercel.app), with a passing [database health check](https://sccpms-api.vercel.app/healthz). Both deploy automatically from this repository's `main` branch and have separate environment variables and `vercel.json`. [Testing results and failure history](docs/TESTING_REPORT.md) distinguish local, cloud, browser and real database checks. Brevo API and Supabase SMTP delivery checks are reported delivered, and live email redirects were inspected. The bound owner administrator retains its Resend OTP route. Real signup/invitation completion and clinical operating acceptance still require authorized users.
 
 ## Project layout
 
@@ -69,6 +69,8 @@ npm run db:migrate --prefix server
 
 Include migrations `024_account_records_invitations.sql` and `025_existing_invitation_state.sql` before using deleted-account Records, reinvitations and invitation completion. They retain profile/clinical identities and send no email.
 
+Apply `026_retire_legacy_nonadmin_otp_drafts.sql` before enabling Brevo on an existing installation. It prevents old unconfirmed drafts from crossing providers while retaining accepted codes, known acknowledgements and the administrator's drafts.
+
 For an existing installation that needs trusted role metadata repaired, use `npm run auth:sync-claims --prefix server`. No build or migration creates demo users, sample appointments or invented analytics.
 
 Start the frontend and API together:
@@ -114,7 +116,7 @@ Brevo sends login OTPs for patients, doctors and receptionists. Resend is restri
 
 The SPU sender setup was canceled on **14 October 2026**. Leave `RESEND_FROM_EMAIL` empty and retain both owner bindings. Configure `BREVO_API_KEY` and `BREVO_FROM_EMAIL` privately in the backend environment. Brevo supports verified individual senders; school DNS is not required. [The previous DNS handoff](RESEND_UNIVERSITY_DNS.md) is historical. See [production email setup](docs/email-delivery.md) for the guarded Brevo SMTP/template runner and live acceptance requirements.
 
-Brevo's live API currently rejects account/sender inspection with HTTP401 IP authorisation blocked. Until access, sender and SMTP setup are verified, other users receive safe unavailable responses and general onboarding remains incomplete. The administrator's bound Resend OTP route stays available. Confirmation, trusted roles and OTP verification remain enforced.
+Brevo access returned HTTP200 after the earlier IP block. Its active sender and SMTP credentials are verified, Supabase custom SMTP/templates are installed, and API/SMTP test messages were reported delivered. Both runtime Brevo settings are stored privately in Vercel. Confirmation, trusted roles and OTP verification remain enforced; complete actual signup/invitation/OTP acceptance with authorized recipients.
 
 Read-only sender checks are available from a securely configured environment:
 

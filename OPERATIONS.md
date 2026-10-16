@@ -42,11 +42,12 @@ Brevo SMTP after setup. A verified individual Brevo sender may use a personal
 mailbox; school DNS is not required. Sender verification, account activation,
 provider quotas and inbox filtering still apply.
 
-Current live account/sender inspection returns HTTP401 IP authorisation blocked.
-SMTP username, active sender and relay status cannot yet be verified. Brevo API
-and SMTP have separate IP policies. Approving a local computer alone does not
-establish access from Vercel or Supabase. General mail is not ready while this
-external blocker remains; no OTP/confirmation checks are bypassed.
+Initial account/sender inspection returned HTTP401 IP authorisation blocked.
+On16October access returned200; the active sender, relay and SMTP credentials
+were verified. Supabase SMTP and live templates are installed. API and actual
+Supabase SMTP test messages were reported delivered. Brevo API and SMTP have
+separate IP policies; keep them compatible with Vercel and Supabase sources.
+Confirmation and OTP checks remain enforced.
 
 Use Node22 and ignored server/.env for administrative SMTP credentials:
 
@@ -57,7 +58,9 @@ npm run auth:configure-brevo --prefix server -- --apply-templates
 ~~~
 
 The helper checks active sender and relay, verifies the SMTP username belongs
-to the account, uses the distinct SMTP key and reads back saved settings. It
+to the account, uses the distinct SMTP key and reads back saved settings. The
+hosted SMTP password is write-only: its write acknowledgement and configured
+presence are checked separately from real SMTP delivery. It
 preserves existing redirect entries, keeps confirmation on and sends no email.
 The runtime API needs only Brevo API credentials; SMTP credentials and the
 Supabase management token are administrative secrets. Deploy after runtime

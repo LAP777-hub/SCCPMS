@@ -24,13 +24,15 @@ have authentication/deliverability limitations; a verified domain is preferable
 for clinic operation. Sender verification, transactional account activation and
 plan quotas apply. [Brevo sender verification](https://help.brevo.com/hc/en-us/articles/208836149-Create-a-new-sender-From-name-and-From-email).
 
-## Current external blocker
+## IP access and delivery checks
 
-Credentials are saved in ignored server configuration. Live account and sender
-inspection returned **HTTP 401, IP authorisation blocked**, including the recheck
-during the 15–16 October implementation. SMTP username, verified sender and relay
-status cannot be established while these requests are blocked. No Brevo inbox
-delivery or Supabase SMTP installation is claimed yet.
+Initial account and sender inspection returned **HTTP401 IP authorisation
+blocked**. On16October both returned **200**: one active sender, an enabled relay
+and the matching SMTP username were established. SMTP authentication succeeded
+with verified TLS. Supabase SMTP and live templates are now installed. An API
+diagnostic was accepted in634ms and a real Supabase recovery email in716ms;
+Brevo reported both **delivered**. These were sent only to the confirmed owner
+administrator as setup diagnostics; admin login OTP still uses Resend.
 
 Open Brevo **Settings → Security → Authorized IPs**. API and SMTP blocking have
 separate switches. Standard Vercel outbound addresses can change; Supabase SMTP
@@ -40,6 +42,13 @@ policy for this hosting arrangement. Local IP approval alone does not establish
 hosted access. [Brevo IP policy](https://help.brevo.com/hc/en-us/articles/5740111683858-Authorize-and-block-IP-addresses-for-API-and-SMTP-security).
 
 ## Configure Brevo and Supabase
+
+Before enabling Brevo on an existing installation, apply migration
+`026_retire_legacy_nonadmin_otp_drafts.sql`. It retires unconfirmed non-admin
+drafts from the earlier provider so their idempotency keys cannot cross
+providers, even when the sending address is identical. Accepted codes, known
+acknowledgements and admin drafts are retained. Apply it through the normal
+versioned migration runner before setting the active Brevo sender.
 
 In ignored `server/.env`, configure `BREVO_API_KEY`, `BREVO_FROM_EMAIL`,
 `BREVO_SMTP_USERNAME`, `BREVO_SMTP_PASSWORD`, `SUPABASE_ACCESS_TOKEN`, and
@@ -62,7 +71,9 @@ npm run auth:configure-brevo --prefix server -- --apply-templates
 
 The helper sends no emails. It verifies an active sender and relay, matches the
 SMTP username to the account, requires an SMTP key, preserves redirects and
-reads back saved changes. It keeps confirmation enabled, a 30-second Auth mail
+reads back saved changes. Supabase's SMTP password is write-only, so its write
+acknowledgement and configured presence are verified separately from actual
+SMTP delivery. It keeps confirmation enabled, a 30-second Auth mail
 cooldown and at least 30 messages/hour, subject to provider quotas. Readback
 does not prove SMTP authentication or inbox delivery.
 [Brevo SMTP](https://developers.brevo.com/docs/smtp-integration),
@@ -71,8 +82,10 @@ does not prove SMTP authentication or inbox delivery.
 The template command requires matching Brevo SMTP. It preserves existing
 callbacks, sets new links to two hours and points to the live application.
 Emails open the application wrapper; its Continue button follows the validated
-Supabase verification URL. Disable Brevo link tracking for authentication mail
-and verify actual links before accepting onboarding. Existing emails retain
+Supabase verification URL. The delivered recovery email's Brevo tracking URL
+was resolved safely to the live wrapper and correct Supabase recovery/redirect
+targets without consuming the verification link. Disabling link tracking is
+recommended for Auth mail; confirm links after provider changes. Existing emails retain
 their original expiry. The older Resend SMTP helper is historical.
 
 ## OTP timing and invitations
