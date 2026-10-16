@@ -2,7 +2,7 @@
 
 **Report date:** 16 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the completed registration, residence search, staff popup and profile-photo release is published at application commit `27d2cfa`, and both Vercel projects were verified READY for that exact commit. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38906863196) passed **394 server checks with six intentional unit-command database skips**, **six separate real PostgreSQL cases**, **114 browser cases**, builds, typechecks and security checks. **9/9 deployed HTTP checks** and **10/10 live address searches** passed. Earlier **8/8 live desktop/mobile email-wrapper checks** and two delivered Brevo API/Supabase SMTP setup messages remain separate evidence. Migrations 027/028 are applied; login OTP lifetime is exactly five minutes. Sections 11h–11k preserve release history, failed attempts, corrections and remaining real-user acceptance work.
+**Status:** the admin overview release is published at application commit `c4a20ca`, and both Vercel projects were verified READY for that exact commit. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38955867246) passed **399 server checks with seven intentional unit-command database skips**, **seven separate real PostgreSQL cases**, **121 browser cases**, builds, typechecks and security checks. **9/9 deployed HTTP checks** and **7/7 live overview/asset/protection checks** passed. Earlier **10/10 live address searches**, **8/8 live desktop/mobile email-wrapper checks** and two delivered Brevo API/Supabase SMTP setup messages remain separate evidence. Migrations 027/028 remain applied; login OTP lifetime is five minutes. Sections 11h–11l preserve release history, failed attempts, corrections and remaining real-user acceptance work.
 
 All valid recipient emails are accepted. The SPU sender plan remains canceled.
 Brevo API/SMTP credentials have now been supplied and saved privately. New
@@ -50,11 +50,11 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest completed cloud server unit run | **400 total: 394 passed, 6 skipped, 0 failed or cancelled** | Node 22; six real database cases opt in; final workflow for `27d2cfa`, 58.685s |
+| Latest completed cloud server unit run | **406 total: 399 passed, 7 skipped, 0 failed or cancelled** | Node 22; seven real database cases opt in; final workflow for `c4a20ca`, 59.651s |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest stable isolated database command | **6/6 passed, 0 skipped, 0 failed or cancelled** | GitHub Linux/PostgreSQL CI for `27d2cfa`, 3.083s; includes all-role deletion/history, provider cutover, five-minute OTP migration, profile persistence/constraints, personal-email persistence, clinical ownership, private Auth audits, shared budgets and late commits; earlier failures retained |
+| Latest stable isolated database command | **7/7 passed, 0 skipped, 0 failed or cancelled** | GitHub Linux/PostgreSQL CI for `c4a20ca`, 5.375s; includes the new admin overview aggregate/clinic-date/zero-state checks and existing deletion/history, OTP, profile, ownership and shared-budget cases; earlier failures retained |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -66,6 +66,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier runtime smoke | Passed at that milestone | API/database health 200, frontend 200, unauthenticated protected API 401; superseded by the current connection incident below |
 | Deployed runtime connectivity | **9/9 live HTTP checks passed** | Frontend/API/database health 200; invitation callback, protected GET/POST/PUT rejection, production CORS and JSON404; campus-network failures remain historical/local evidence in sections 11b/11d |
 | Live Kimberley address/residence searches | **10/10 passed** | Real Long Street/New Park coordinates plus eight catalogue/alias results; catalogue-only names retain null coordinates and manual entry |
+| Deployed admin overview checks | **7/7 passed** | Correct production API origin, header/search, separate overview bundle, empty/unavailable states, unauthenticated denial and production CORS |
 | Hosted development redirect routing | Passed | Saved/read back 5173; default/signup/invite/recovery HTTP 303 probes resolve to the development frontend |
 | Resend key/domain API | Passed key acceptance | Authenticated read-only domain lookup succeeded; this is not delivery acceptance |
 | Former university sending domain | **Canceled; historical setup only** | `clinic.spu.ac.za` was prepared but unverified; the active verified Brevo sender now supports general delivery |
@@ -75,7 +76,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **114 passed, 0 failed** | GitHub Linux CI for `27d2cfa`, 1.8 minutes; Records popup/deletion/reinvite, reports/mobile plots, cross-role mocked live refresh, five-minute OTP, signup/invitation callbacks, calling codes, residence fallback and all-role photo upload/reload |
+| Latest full browser run | **121 passed, 0 failed** | GitHub Linux CI for `c4a20ca`, 1.9 minutes; reference overview, actual15-second polling, quick actions/search, preserved forms, responsive layout and all previous role/session/email/photo cases |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -1286,6 +1287,10 @@ workflows remain in use. No operational sample data is seeded.
 | Final full local browser regression | **121/121 passed**, 2.7minutes; includes the corrected mobile drawer, empty/populated overview, actual15-second polling, outage recovery, preserved unsaved form, existing quick-action forms, real-shaped search, desktop/tablet/mobile grids and all prior role/session/email/profile checks |
 | Final typechecks/builds | Frontend no-emit TypeScript, backend TypeScript/build and frontend production fixture build passed |
 | Publication scan | **518 indexed files, zero findings**; environments, diagnostic logs and screenshots remain ignored |
+| Final cloud regression | Exact application commit `c4a20ca`: **406 total /399 server passes /seven intentional unit-command skips /zero failures or cancellations**, 59.651s; separate real PostgreSQL **7/7**, 5.375s; browser **121/121**, 1.9minutes; frontend/backend builds, typechecks and security scan passed |
+| Final Vercel application release | Frontend and API both verified READY for exact commit `c4a20ca05b515e4e9c9930af74e9ed515378c772` |
+| Final live overview checks | **7/7 passed**, 16 October at21:34SAST: frontend/header assets, correct live API endpoint, separate overview bundle, genuine empty/unavailable states, unauthenticated endpoint denial and production CORS |
+| Final existing runtime checks | **9/9 passed**, 16 October at21:34SAST: frontend, email callback route, API root, PostgreSQL health, protected photo GET/PUT and OTP POST denial, production CORS and JSON404 |
 
 The existing15-second polling/live-event mechanism updates the data in place.
 Opening a new appointment or patient form uses the existing workflow directly;
@@ -1294,8 +1299,12 @@ Search opens the real patient/staff directory with the selected account filter.
 
 No real accounts, appointments or clinical records were created or modified for
 this overview validation. The isolated database fixture is kept separate from
-the production consistency read. Hosted release results are recorded after
-publication.
+the production consistency read. Published
+[application commit](https://github.com/LAP777-hub/SCCPMS/commit/c4a20ca05b515e4e9c9930af74e9ed515378c772)
+and [successful cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38955867246).
+This final evidence update changes documentation only. Authenticated live-user
+workflow acceptance remains distinct from fixture browser tests and the
+read-only production aggregate check.
 
 ## 12. Supporting documents
 
