@@ -81,7 +81,7 @@ test('pending code lifetime remains stable when the default lifetime changes bef
   assert.doesNotMatch(JSON.parse(String(fixture.calls[0].body)).text, /15 minutes/);
 });
 
-test('the request deadline also aborts a stalled provider response body', async () => {
+test('the request deadline also aborts a stalled provider response body', { timeout: 5000 }, async () => {
   const server = createServer((_request, response) => { response.writeHead(200, { 'Content-Type': 'application/json' }); response.write('{'); });
   server.listen(0, '127.0.0.1');
   await new Promise<void>(resolve => server.once('listening', resolve));
@@ -98,7 +98,18 @@ test('the request deadline also aborts a stalled provider response body', async 
     assert.equal(attempts, 1, 'the budget cannot accommodate a second attempt');
     assert.ok(performance.now() - started < 2000, 'the stalled body must not create an indefinite busy screen');
   } finally {
+    server.close();
     server.closeAllConnections();
-    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    server.unref();
   }
+});
+
+for (const stage of ['headers', 'body'] as const) test(`provider deadline returns even when the ${stage} transport ignores cancellation`, { timeout: 2000 }, async () => {
+  const never = () => new Promise<never>(() => undefined);
+  const started = performance.now();
+  await assert.rejects(sendOtpEmail('patient@spu.ac.za', '123456', challenge, settings, 300, {
+    fetcher: stage === 'headers' ? never : async () => ({ ok: true, json: never }) as unknown as Response,
+    timeoutMs: 40, attemptTimeoutMs: 30,
+  }), { reason: 'timeout', deliveryOutcome: 'unknown' });
+  assert.ok(performance.now() - started < 1000);
 });

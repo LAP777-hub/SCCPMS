@@ -34,7 +34,6 @@ const departments = [
   'Internal Medicine',
   'Cardiology',
   'Ophthalmology',
-  'Front Desk / Reception',
 ];
 
 export default function StaffRegistrationModal({ open, onClose, defaultRole = 'doctor' }: Props) {
@@ -72,7 +71,7 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
           role,
           fullName,
           phone: phone.replace(/[\s()-]/g, ''),
-          department: department || undefined,
+          department: role === 'receptionist' ? 'Reception / Front desk' : department || undefined,
           specialty: role === 'doctor' ? (specialty || undefined) : undefined,
         }),
       });
@@ -125,14 +124,14 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
                   <button
                     type="button"
                     className={role === 'doctor' ? 'active' : ''}
-                    onClick={() => setRole('doctor')}
+                    onClick={() => { setRole('doctor'); setDepartment(''); }}
                   >
                     <Stethoscope size={18} /> Doctor
                   </button>
                   <button
                     type="button"
                     className={role === 'receptionist' ? 'active' : ''}
-                    onClick={() => setRole('receptionist')}
+                    onClick={() => { setRole('receptionist'); setDepartment(''); }}
                   >
                     <UsersRound size={18} /> Receptionist
                   </button>
@@ -170,9 +169,8 @@ export default function StaffRegistrationModal({ open, onClose, defaultRole = 'd
                 <label className="admin-form-group">
                   <span className="admin-form-label">Department</span>
                   <span className="admin-form-control">
-                    <select value={department} onChange={(e) => setDepartment(e.target.value)}>
-                      <option value="">Select department</option>
-                      {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                    <select value={role === 'receptionist' ? 'Reception / Front desk' : department} onChange={(e) => setDepartment(e.target.value)}>
+                      {role === 'receptionist' ? <option value="Reception / Front desk">Reception / Front desk</option> : <><option value="">Select department</option>{departments.map((d) => <option key={d} value={d}>{d}</option>)}</>}
                     </select>
                   </span>
                 </label>

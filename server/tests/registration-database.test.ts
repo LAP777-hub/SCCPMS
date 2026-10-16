@@ -51,6 +51,20 @@ test('registration address and academic details persist in an isolated database 
     };
     await query(facultyMigration);
     await verifyFacultyMigration();
+    const receptionistId = randomUUID();
+    await query("INSERT INTO profiles(id,email,role,department) VALUES ($1,'reception-photo-fixture@example.invalid','receptionist','Cardiology')", [receptionistId]);
+    const photoMigration = await readFile(new URL('../sql/027_profile_photos_reception_department.sql', import.meta.url), 'utf8');
+    await query(photoMigration); await query(photoMigration);
+    assert.equal((await query('SELECT department FROM profiles WHERE id=$1', [receptionistId])).rows[0].department, 'Reception / Front desk');
+    await verifyFacultyMigration();
+    const avatar = `${receptionistId}/${randomUUID()}.webp`;
+    await query('UPDATE profiles SET avatar_path=$2 WHERE id=$1', [receptionistId, avatar]);
+    assert.equal((await query('SELECT avatar_path FROM profiles WHERE id=$1', [receptionistId])).rows[0].avatar_path, avatar);
+    for (const [column, value] of [['avatar_path', `${clinicalDoctorId}/${randomUUID()}.webp`], ['department', 'Cardiology']]) {
+      await query('SAVEPOINT photo_policy');
+      await assert.rejects(query(`UPDATE profiles SET ${column}=$2 WHERE id=$1`, [receptionistId, value]), /check constraint/);
+      await query('ROLLBACK TO SAVEPOINT photo_policy');
+    }
     await query(facultyMigration);
     await verifyFacultyMigration();
     mock.method(pool, 'query', query);

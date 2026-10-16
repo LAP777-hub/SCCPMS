@@ -1,0 +1,3 @@
+.registration-phone { display: grid; grid-template-columns: minmax(92px, .7fr) minmax(0, 1fr); gap: 8px; }
+.registration-phone .field-control { min-width: 0; }
+.registration-phone select, .registration-phone input { width: 100%; min-width: 0; }

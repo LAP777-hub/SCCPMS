@@ -142,20 +142,30 @@ export async function sendOtpEmail(email: string, code: string, challengeId: str
     const remaining = budget - (now() - started);
     if (remaining <= 0) throw new EmailDeliveryError('timeout');
     let failure: EmailDeliveryError;
+    const controller = new AbortController();
+    // Keep an explicit timer/controller alive through JSON body consumption.
+    // A provider can send headers promptly and then stall its response body.
+    let deadlineTimer: ReturnType<typeof setTimeout>;
+    const deadline = new Promise<never>((_, reject) => {
+      deadlineTimer = setTimeout(() => {
+        reject(new EmailDeliveryError('timeout'));
+        controller.abort(new DOMException('Email request deadline reached.', 'TimeoutError'));
+      }, Math.max(1, Math.floor(Math.min(attemptTimeout, remaining))));
+    });
     try {
-      const response = await fetcher(selection.provider === 'resend' ? 'https://api.resend.com/emails' : 'https://api.brevo.com/v3/smtp/email', {
+      const response = await Promise.race([fetcher(selection.provider === 'resend' ? 'https://api.resend.com/emails' : 'https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: selection.provider === 'resend'
           ? { Authorization: `Bearer ${settings.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': `otp/${challengeId}` }
           : { 'api-key': settings.BREVO_API_KEY!, 'Content-Type': 'application/json', Accept: 'application/json' },
         body,
         redirect: 'error',
-        signal: AbortSignal.timeout(Math.max(1, Math.floor(Math.min(attemptTimeout, remaining)))),
-      });
+        signal: controller.signal,
+      }), deadline]);
       let payload: unknown;
-      try { payload = await response.json(); }
+      try { payload = await Promise.race([response.json(), deadline]); }
       catch (error) {
-        if (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name)) throw error;
+        if (error instanceof EmailDeliveryError || (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name))) throw error;
         payload = null;
       }
       if (!response.ok) throw rejectedEmail(response, payload, selection.provider);
@@ -167,7 +177,7 @@ export async function sendOtpEmail(email: string, code: string, challengeId: str
     } catch (error) {
       failure = error instanceof EmailDeliveryError ? error
         : new EmailDeliveryError(error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name) ? 'timeout' : 'network');
-    }
+    } finally { clearTimeout(deadlineTimer!); }
     const retryable = failure.reason !== 'duplicate_request' && (['timeout', 'network', 'invalid_response', 'rate_limited'].includes(failure.reason)
       || (failure.statusCode !== undefined && failure.statusCode >= 500)
       || (failure.statusCode === 409 && failure.deliveryOutcome === 'unknown'));

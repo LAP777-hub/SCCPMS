@@ -64,7 +64,7 @@ Set these variables on the **API** project's Production environment:
 | `SUPABASE_ANON_KEY` | The same public key as frontend `VITE_SUPABASE_ANON_KEY` |
 | `SUPABASE_SERVICE_ROLE_KEY` | That project's private service-role or secret API key |
 | `OTP_HMAC_SECRET` | A securely generated random secret of at least 32 characters, consistent across all API instances |
-| `OTP_VALIDITY_SECONDS` | `600`: code validity from provider acceptance; permitted range 120–900 |
+| `OTP_VALIDITY_SECONDS` | `300`: exactly five minutes from provider acceptance |
 | `OTP_RESEND_COOLDOWN_SECONDS` | `30`: minimum interval after accepted sending; permitted range 30–300 |
 | `RESEND_API_KEY` | Full sending key for the bound administrator OTP route only |
 | `RESEND_FROM_EMAIL` | Leave empty; this legacy setting never enables general Resend delivery |

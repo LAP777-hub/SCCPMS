@@ -34,7 +34,7 @@ for (const role of ['patient', 'student', 'lecturer', 'staff', 'doctor', 'recept
     const transport = fixture();
     const identity = { ...patient, role };
     assert.deepEqual(selectOtpEmailDelivery(identity, settings), {provider: 'brevo', senderFrom: settings.BREVO_FROM_EMAIL});
-    const result = await sendOtpEmail(email, '123456', challengeId, settings, 600, transport.transport, identity);
+    const result = await sendOtpEmail(email, '123456', challengeId, settings, 300, transport.transport, identity);
     assert.equal(result.messageId, messageId);
     assert.equal(transport.calls.length, 1);
     const { url, init } = transport.calls[0];
@@ -47,7 +47,7 @@ for (const role of ['patient', 'student', 'lecturer', 'staff', 'doctor', 'recept
     assert.deepEqual(body.to, [{email}]);
     assert.deepEqual(body.headers, {idempotencyKey: challengeId});
     assert.match(body.htmlContent, /123456/);
-    assert.match(body.htmlContent, /10 minutes/);
+    assert.match(body.htmlContent, /5 minutes/);
     assert.equal(body.textContent, undefined, 'Brevo accepts one content variant per message');
     assert.equal(init.redirect, 'error');
     assert.ok(init.signal);

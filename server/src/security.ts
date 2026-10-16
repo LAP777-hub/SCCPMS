@@ -46,7 +46,8 @@ export function sanitizeRequest(req: Request, res: Response, next: NextFunction)
 // Request size validation
 export function validateRequestSize(req: Request, res: Response, next: NextFunction) {
   const contentLength = parseInt(req.headers['content-length'] || '0', 10);
-  const maxSize = 256 * 1024; // Allows validated SOAP notes, including Unicode.
+  const photoUpload = req.path === '/api/profile/photo' && req.method === 'PUT';
+  const maxSize = photoUpload ? 2 * 1024 * 1024 : 256 * 1024;
 
   if (contentLength > maxSize) {
     logger.warn('Request size exceeded', {
@@ -68,7 +69,9 @@ export function validateContentType(req: Request, res: Response, next: NextFunct
     
     // Only validate content-type if there's a body
     if (contentLength > 0) {
-      if (!contentType || !contentType.includes('application/json')) {
+      const photoUpload = req.path === '/api/profile/photo' && req.method === 'PUT'
+        && /^image\/(jpeg|png|webp)(?:;|$)/i.test(contentType ?? '');
+      if (!photoUpload && (!contentType || !contentType.includes('application/json'))) {
         logger.warn('Invalid content type', {
           requestId: req.id,
           contentType,

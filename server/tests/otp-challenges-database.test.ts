@@ -203,6 +203,35 @@ test('OTP delivery leases, acknowledgement transactions and retries preserve rea
     assert.equal((await database.query("SELECT count(*)::int AS count FROM audit_events WHERE action='auth.otp_provider_cutover'")).rows[0].count, 3, 'reapplying the cutover creates no duplicate audit events');
     assert.ok(JSON.stringify((await database.query('SELECT * FROM otp_verified_sessions ORDER BY user_id,session_id')).rows)
       === JSON.stringify(verifiedBeforeCutover), 'verified sessions are also unchanged on reapplication');
+    const fiveMinuteMigration = await readFile(new URL('../sql/028_five_minute_otp_policy.sql', import.meta.url), 'utf8');
+    const policyCases = [
+      { state: 'pending', seconds: 600, retire: true },
+      { state: 'pending', seconds: 300, retire: false },
+      { state: 'accepted', seconds: 600, retire: false },
+      { state: 'accepted', seconds: 240, retire: false },
+    ];
+    const policyIds: string[] = [], accepted = new Date();
+    for (const fixture of policyCases) {
+      const who = newIdentity(), id = randomUUID(); policyIds.push(id);
+      await database.query(`INSERT INTO otp_challenges(id,user_id,session_id,email_hash,code_hash,delivery_state,
+        expires_at,accepted_at,validity_seconds,code_version,delivery_attempt_at)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,1,now())`,
+      [id, who.userId, who.sessionId, who.emailHash, pending.code_hash, fixture.state,
+        new Date(accepted.getTime() + fixture.seconds * 1000), fixture.state === 'accepted' ? accepted : null, fixture.seconds]);
+    }
+    await database.query(fiveMinuteMigration);
+    for (let index = 0; index < policyCases.length; index++) {
+      const fixture = policyCases[index];
+      const row = (await database.query('SELECT * FROM otp_challenges WHERE id=$1', [policyIds[index]])).rows[0];
+      assert.equal(Boolean(row.consumed_at), fixture.retire);
+      if (fixture.state === 'accepted') assert.equal(row.expires_at.getTime(), accepted.getTime() + Math.min(fixture.seconds, 300) * 1000);
+    }
+    const policyAfter = (await database.query('SELECT * FROM otp_challenges ORDER BY id')).rows;
+    const auditCount = (await database.query("SELECT count(*)::int AS count FROM audit_events WHERE action='auth.otp_five_minute_policy'")).rows[0].count;
+    await database.query(fiveMinuteMigration);
+    assert.deepEqual((await database.query('SELECT * FROM otp_challenges ORDER BY id')).rows, policyAfter);
+    assert.equal((await database.query("SELECT count(*)::int AS count FROM audit_events WHERE action='auth.otp_five_minute_policy'")).rows[0].count, auditCount);
+    assert.deepEqual((await database.query('SELECT * FROM otp_verified_sessions ORDER BY user_id,session_id')).rows, verifiedBeforeCutover);
   } finally {
     config.OTP_VALIDITY_SECONDS = originalValidity;
     config.RESEND_FROM_EMAIL = originalSender;

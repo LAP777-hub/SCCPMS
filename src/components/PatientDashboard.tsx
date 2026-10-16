@@ -37,6 +37,7 @@ import {
 } from '../lib/dashboardTime';
 import { useDoctorAvailability } from '../lib/useDoctorAvailability';
 import SidebarBrand from './SidebarBrand';
+import ProfilePhoto from './ProfilePhoto';
 import './ClinicalDashboards.css';
 
 const PatientTimezoneContext = createContext(campusTimezone);
@@ -882,7 +883,7 @@ function ProfileView({ profile }: { profile: Profile | null }) {
       />
       <Card className="patient-profile-header">
         <div className="patient-large-profile">
-          <Avatar name={profile?.full_name || profile?.email || 'Patient'} />
+          <ProfilePhoto className="patient-avatar" />
           <span>
             <h2>{profile?.full_name || 'Name not provided'}</h2>
             <b>Patient</b>
@@ -1475,7 +1476,7 @@ export default function PatientDashboard() {
                 <Bell size={19} />
               </button>
               <div className="patient-user">
-                <Avatar name={profile?.full_name || profile?.email || 'Patient'} />
+                <ProfilePhoto className="patient-avatar" />
                 <span>
                   <strong>{profile?.full_name || profile?.email}</strong>
                   <small>{profile?.user_type || 'Patient'}</small>

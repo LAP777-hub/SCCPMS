@@ -1,8 +1,9 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { ArrowRight, KeyRound, LockKeyhole } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import PasswordToggle from './PasswordToggle';
 import BrandPanel from './BrandPanel';
+import './PasswordRecoveryScreen.css';
 
 export default function PasswordRecoveryScreen({ invitation = false }: { invitation?: boolean }) {
   const { session, profile, loading: checkingSession, completePasswordRecovery, signOut } = useAuth();
@@ -13,6 +14,16 @@ export default function PasswordRecoveryScreen({ invitation = false }: { invitat
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const invitationDialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!invitation) return;
+    const dialog = invitationDialog.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    dialog.querySelector<HTMLElement>(updated ? '.primary-button' : '#setup-password')?.focus({ preventScroll: true });
+    return () => { if (dialog.open) dialog.close(); };
+  }, [invitation, updated]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,8 +56,8 @@ export default function PasswordRecoveryScreen({ invitation = false }: { invitat
     finally { setLoading(false); }
   }
 
-  return <main className="portal-shell"><BrandPanel /><section className="form-panel"><div className="form-card">
-    <div className="form-heading"><span className="mobile-kicker">ACCOUNT SECURITY</span><h2>{invitation ? 'Set your password' : 'Reset your password'}</h2><p>{invitation ? 'Create a password to activate your invited SCCPMS account.' : 'Choose a new password for your SCCPMS account.'}</p></div>
+  const passwordForm = <div className="form-card">
+    <div className="form-heading"><span className="mobile-kicker">ACCOUNT SECURITY</span><h2 id="password-setup-heading">{invitation ? 'Set your password' : 'Reset your password'}</h2><p id="password-setup-description">{invitation ? 'Create and confirm your own password for your invited SCCPMS account. Then sign in with your email, password and assigned role.' : 'Choose a new password for your SCCPMS account.'}</p></div>
     {profile?.email && <p>Account: {profile.email}</p>}
     {updated ? <div className="success-state"><span className="success-icon"><KeyRound size={30} /></span><h3>Password updated</h3><p>Sign in again with your new password and enter the verification code sent to your email.</p>{error && <div className="login-error" role="alert">{error}</div>}<button className="primary-button" type="button" disabled={loading} onClick={() => void returnToSignIn()}>{loading ? 'Returning to sign in...' : 'Return to sign in'} <ArrowRight size={18} /></button></div> :
       <form className="login-form" onSubmit={submit}>
@@ -57,5 +68,13 @@ export default function PasswordRecoveryScreen({ invitation = false }: { invitat
         <button className="primary-button" type="submit" disabled={loading || checkingSession || !session}>{loading ? 'Updating...' : 'Update Password'} <ArrowRight size={18} /></button>
         <button className="secondary-button" type="button" disabled={loading} onClick={() => void returnToSignIn()}>{loading ? 'Returning to sign in...' : 'Return to sign in'}</button>
       </form>}
-  </div></section></main>;
+  </div>;
+
+  return <main className="portal-shell"><BrandPanel /><section className="form-panel">
+    {invitation ? <div className="form-card invitation-password-background" aria-hidden="true">
+      <div className="form-heading"><span className="mobile-kicker">STAFF ACCOUNT</span><h2>Welcome to SCCPMS</h2><p>Finish setting up your invited clinic account to sign in.</p></div>
+    </div> : passwordForm}
+  </section>{invitation && <dialog ref={invitationDialog} className="invitation-password-modal"
+    aria-labelledby="password-setup-heading" aria-describedby="password-setup-description"
+    onCancel={event => event.preventDefault()}>{passwordForm}</dialog>}</main>;
 }

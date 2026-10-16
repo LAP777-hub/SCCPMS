@@ -90,11 +90,24 @@ their original expiry. The older Resend SMTP helper is historical.
 
 ## OTP timing and invitations
 
-Codes last ten minutes from provider acknowledgement, with a 30-second resend
+Codes last exactly five minutes from provider acknowledgement (`OTP_VALIDITY_SECONDS=300`), with a 30-second resend
 cooldown. Failed resends preserve an existing valid code. Replacements activate
 only after provider acknowledgement and database commit. Single-use hashes,
 session/email binding, five failed guesses and ten new challenges/hour remain
 enforced. Missing configuration does not reserve a new challenge.
+
+The five-minute countdown starts after provider acceptance, never when the form
+opens. Apply migration `028_five_minute_otp_policy.sql` with this release to retire
+older pending payloads and cap outstanding accepted codes at five minutes from
+their original acceptance; already verified login sessions are unchanged.
+
+Delivery within 60 seconds is the operational target. Dispatch is immediate;
+there is no application mail queue or intentional delay. Provider acceptance
+duration is logged without the recipient, code or provider key. Measure actual
+delivery separately using Brevo's `requests` and `delivered` event timestamps;
+an API success alone does not establish receipt. Deferrals, bounces, spam
+filtering and recipient-server delays can exceed the target.
+[Brevo transactional events](https://developers.brevo.com/reference/get-email-event-report).
 
 Provider calls have a ten-second budget and at most one transient retry, using
 the same payload and challenge key. Resend uses HTTP `Idempotency-Key`; Brevo
@@ -106,7 +119,7 @@ outages or inbox filtering.
 [Brevo idempotency](https://developers.brevo.com/docs/heterogenous-versions-batch-emails).
 
 Invited doctors/receptionists follow the live link, create and confirm a
-password, then sign in and verify OTP for their trusted role. Signup confirmation
+password in the application's setup popup, then sign in and verify OTP for their trusted role. Signup confirmation
 returns patients to sign-in. Invitation acceptance notifications and audits
 follow provider acknowledgement. Browser role selection never grants access.
 

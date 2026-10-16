@@ -67,7 +67,7 @@ Supabase management token are administrative secrets. Deploy after runtime
 configuration changes. Disable link tracking for Auth mail and verify real
 messages before accepting onboarding.
 
-Login codes last ten minutes after provider acknowledgement. Failed resends
+Login codes last five minutes after provider acknowledgement. Failed resends
 preserve an existing valid code. Calls have a ten-second budget and reuse their
 challenge idempotency key. An unknown delivery is never reported as activated.
 See [provider setup, exact keys and required live acceptance](docs/email-delivery.md).

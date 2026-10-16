@@ -15,6 +15,86 @@ const selectedAddress = {
 };
 const successMessage = 'Check your email to confirm your account before signing in.';
 
+test('ZA calling-code selection normalizes a local ten-digit number and saves the nine-digit national number with +27', async ({ page }) => {
+  const { submissions } = await openRegistration(page);
+  await fillIdentity(page); await chooseAcademicDetails(page);
+  await expect(page.getByLabel('Phone country code')).toHaveValue('ZA');
+  await page.getByLabel('Phone (international format)').fill('081 234 5678');
+  await expect(page.getByLabel('Phone (international format)')).toHaveValue('812345678');
+  await page.getByRole('combobox', { name: 'Residential Address', exact: true }).fill('My current accommodation, Kimberley');
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions[0].phone).toBe('+27812345678');
+});
+
+test('changing calling country clears the number and an incomplete ZA number cannot register', async ({ page }) => {
+  const { submissions } = await openRegistration(page);
+  await fillIdentity(page); await chooseAcademicDetails(page);
+  await page.getByLabel('Phone (international format)').fill('81234567');
+  await page.getByRole('combobox', { name: 'Residential Address', exact: true }).fill('Manual accommodation, Kimberley');
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  expect(submissions.length).toBe(0);
+  expect(await page.getByLabel('Phone (international format)').evaluate(input => (input as HTMLInputElement).validity.patternMismatch)).toBe(true);
+  await page.getByLabel('Phone country code').selectOption('LS');
+  await expect(page.getByLabel('Phone (international format)')).toHaveValue('');
+});
+
+test('a foreign international prefix cannot silently become a ZA phone number', async ({ page }) => {
+  const { submissions } = await openRegistration(page);
+  await fillIdentity(page); await chooseAcademicDetails(page);
+  await page.getByRole('combobox', { name: 'Residential Address', exact: true }).fill('Manual accommodation, Kimberley');
+  const phone = page.getByLabel('Phone (international format)');
+  for (const number of ['+376712345', '00376712345', '08123letters45678']) {
+    await phone.fill(number);
+    await expect(phone).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.locator('input[name="phone"]')).toHaveValue('');
+    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+    expect(submissions).toHaveLength(0);
+  }
+  await phone.fill('+27 (0)81 234 5678');
+  await expect(phone).toHaveValue('812345678');
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions[0].phone).toBe('+27812345678');
+});
+
+test('a significant Italian leading zero is preserved in the saved international number', async ({ page }) => {
+  const { submissions } = await openRegistration(page);
+  await fillIdentity(page); await chooseAcademicDetails(page);
+  await page.getByLabel('Phone country code').selectOption('IT');
+  await page.getByLabel('Phone (international format)').fill('+39 (02) 1234 5678');
+  await expect(page.getByLabel('Phone (international format)')).toHaveValue('0212345678');
+  await page.getByRole('combobox', { name: 'Residential Address', exact: true }).fill('Manual accommodation, Kimberley');
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions[0].phone).toBe('+390212345678');
+});
+
+test('a named residence without map coordinates saves its real name without fabricated latitude or longitude', async ({ page }) => {
+  const { submissions } = await openRegistration(page);
+  await page.route('**/registration/addresses?**', route => route.fulfill({ json: { data: [{ id: 'spu-rise', address: 'Rise Residence, Kimberley, Northern Cape, South Africa', latitude: null, longitude: null, source: 'spu' }] } }));
+  await fillIdentity(page); await chooseAcademicDetails(page);
+  await page.getByRole('combobox', { name: 'Residential Address', exact: true }).fill('Rise');
+  await page.getByRole('option', { name: /Rise Residence/ }).click();
+  await expect(page.getByRole('link', { name: 'View selected location' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect.poll(() => submissions.length).toBe(1);
+  expect(submissions[0]).toMatchObject({ addressLine1: 'Rise Residence, Kimberley, Northern Cape, South Africa', addressSource: 'manual' });
+  expect(submissions[0]).not.toHaveProperty('addressLatitude'); expect(submissions[0]).not.toHaveProperty('addressLongitude');
+});
+
+test('address search can retry a failed provider without losing the entered accommodation', async ({ page }) => {
+  const options = { addressUnavailable: true };
+  const { searches } = await openRegistration(page, options);
+  const input = page.getByRole('combobox', { name: 'Residential Address', exact: true });
+  await input.fill('Long Street');
+  await expect(page.getByRole('button', { name: 'Retry address search' })).toBeVisible();
+  options.addressUnavailable = false;
+  await page.getByRole('button', { name: 'Retry address search' }).click();
+  await expect(page.getByRole('option', { name: selectedAddress.address, exact: true })).toBeVisible();
+  await expect(input).toHaveValue('Long Street'); expect(searches.length).toBe(2);
+});
+
 async function openRegistration(page: Page, options: { addressUnavailable?: boolean } = {}) {
   const submissions: Record<string, unknown>[] = [];
   const searches: { query: string; authorization?: string }[] = [];

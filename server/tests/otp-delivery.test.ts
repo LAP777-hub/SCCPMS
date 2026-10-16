@@ -54,7 +54,7 @@ test('email OTP uses Resend and retains its accepted message reference', async (
   assert.deepEqual(payload.to, [email]);
   assert.equal(payload.from, liveSettings.RESEND_FROM_EMAIL);
   assert.match(payload.text, /123456/);
-  assert.match(payload.text, /10 minutes/i);
+  assert.match(payload.text, /5 minutes/i);
   assert.ok(!JSON.stringify(accepted).includes('123456'));
 });
 for (const [name, payload] of [
@@ -110,7 +110,7 @@ async function sendFixture(cooldown: boolean, hourlyCount = 0) {
     query: async (sql: string, values?: unknown[]) => {
       statements.push({ sql, values });
       if (sql.includes('SELECT policy.*')) return { rows: [{ hourly_count: hourlyCount, retry_after_seconds: cooldown ? 30 : 0, id: null }], rowCount: 1 };
-      if (sql.includes('SELECT delivery_state')) return { rows: [{ delivery_state: 'pending', consumed_at: null, accepted_at: null, validity_seconds: 600, expires_at: new Date(), too_old: false }], rowCount: 1 };
+      if (sql.includes('SELECT delivery_state')) return { rows: [{ delivery_state: 'pending', consumed_at: null, accepted_at: null, validity_seconds: config.OTP_VALIDITY_SECONDS, expires_at: new Date(), too_old: false }], rowCount: 1 };
       return { rows: [{ id: userId }], rowCount: 1 };
     }, release() {},
   }));
@@ -155,7 +155,7 @@ test('OTP send saves its email binding and accepted reference and ignores a reci
   assert.notEqual(savedCode, sentCode);
   assert.ok(!JSON.stringify(result.body).includes(sentCode));
   assert.ok(!JSON.stringify(result.body).includes('attacker'));
-  assert.equal(result.body.expiresInSeconds, 600);
+  assert.equal(result.body.expiresInSeconds, 300);
   assert.equal(result.body.retryAfterSeconds, 30);
   assert.ok(Date.parse(result.body.expiresAt) > Date.now());
 });

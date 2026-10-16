@@ -1,0 +1,12 @@
+.clinic-dialog { box-sizing: border-box; width: min(860px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #42536a; border-radius: 15px; background: #07121f; color: #edf0f4; box-shadow: 0 24px 80px #0009; overflow: auto; font-size: 16px; line-height: 1.55; }
+.clinic-dialog::backdrop { background: #020711ba; backdrop-filter: blur(4px); }
+.clinic-dialog-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #273849; background: #07121f; }
+.clinic-dialog-header h2 { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: 23px; line-height: 1.35; }
+.clinic-dialog-header button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid #42536a; border-radius: 8px; background: #101e2f; color: inherit; cursor: pointer; }
+.clinic-dialog-header button:disabled { opacity: .5; cursor: wait; }
+.clinic-dialog-content { padding: 20px; }
+.clinic-dialog-content :is(p, a, dd, strong, small) { overflow-wrap: anywhere; }
+.clinic-dialog-content .clinic-ops-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.clinic-dialog a { color: #8dd5ff; }
+.clinic-dialog button:focus-visible { outline: 2px solid #8dd5ff; outline-offset: 3px; }
+@media (max-width: 600px) { .clinic-dialog-content, .clinic-dialog-header { padding: 15px; } .clinic-dialog-content .clinic-ops-form { grid-template-columns: 1fr; } }

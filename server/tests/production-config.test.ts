@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { config, configSchema } from '../src/config.js';
 
 const production = { ...config, NODE_ENV: 'production', FRONTEND_ORIGIN: 'https://clinic.example.invalid', DATABASE_SSL_MODE: 'verify-full', RESEND_API_KEY: 're_test_fixture_only_0123456789', RESEND_FROM_EMAIL: 'SCCPMS Clinic <clinic@notifications.sccpms-fixture.co.za>', RESEND_ADMIN_OWNER_EMAIL: 'admin.owner.fixture@gmail.com', RESEND_ADMIN_OWNER_USER_ID: '00000000-0000-4000-8000-000000000081', BREVO_API_KEY: '', BREVO_FROM_EMAIL: '' };
+
+test('login codes have exactly five minutes of validity by default and in configured deployments', () => {
+  const defaults = configSchema.parse({ ...production, OTP_VALIDITY_SECONDS: undefined });
+  assert.equal(defaults.OTP_VALIDITY_SECONDS, 300);
+  assert.equal(configSchema.parse({ ...production, OTP_VALIDITY_SECONDS: '300' }).OTP_VALIDITY_SECONDS, 300);
+  for (const seconds of [0, 120, 299, 301, 600, 900]) {
+    assert.equal(configSchema.safeParse({ ...production, OTP_VALIDITY_SECONDS: seconds }).success, false);
+  }
+});
 test('a legacy Resend sender alone cannot enable general production delivery', () => {
   assert.equal(configSchema.safeParse({ ...production, RESEND_ADMIN_OWNER_EMAIL: '', RESEND_ADMIN_OWNER_USER_ID: '' }).success, false);
 });

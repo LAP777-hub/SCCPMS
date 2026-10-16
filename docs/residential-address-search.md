@@ -61,6 +61,34 @@ sets `address_source="photon"` with both coordinates. Editing selected text clea
 its old coordinates; subsequent profile address edits also clear stale map data.
 A provider error, no results, or an exhausted quota never blocks manual entry.
 
+## Residence names and retry support — 16 October 2026
+
+Search now combines real Photon results with 23 residence/cluster names from
+[SPU's housing page](https://www.spu.ac.za/index.php/residences/) and its
+[published off-campus coordinator list](https://www.spu.ac.za/wp-content/uploads/2025/07/Student-Coordinators.docx).
+The seven university residences and sixteen listed off-campus residences or
+clusters are held in `server/src/residence-catalogue.ts`. Ntabiseng Courts and
+Lawson were added from the administrator's supplied list; they are labelled as
+clinic catalogue entries, not university accreditation claims. Spelling aliases
+include Massouh, Rathaga, Hanetjie, Long Street Lofts, Rise Student Living and
+My Studend SA. This is a dated catalogue, not a claim to contain every present
+or future private property.
+
+Catalogue suggestions have `source="spu"` or `"clinic"` and null coordinates.
+Their source is shown in the dropdown. Choosing one saves the accommodation
+name and Kimberley locality as the residential address with the existing
+non-geocoded `address_source="manual"` representation. No street number, map
+marker or latitude/longitude is inferred. Genuine Photon selections retain
+their coordinates and `address_source="photon"` as before. The original sources
+must be checked when extending or changing the catalogue.
+
+Residence matches remain available if Photon is unavailable; other addresses
+remain manually editable. The input validates returned result shapes/bounds,
+uses a cancellable ten-second request deadline without requiring
+`AbortSignal.any`, and offers Retry address search without losing typed text.
+The existing provider budget, Kimberley bounds and manual-entry validation
+remain in place. The live Long Street search was rechecked successfully.
+
 ## Verification on 13 October 2026
 
 - Live provider and application API queries for **Long Street**, **New Park** and

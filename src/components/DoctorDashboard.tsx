@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
+import ProfilePhoto from './ProfilePhoto';
 import { apiRequest } from '../lib/api';
 import SidebarBrand from './SidebarBrand';
 import {
@@ -1061,9 +1062,7 @@ export default function DoctorDashboard() {
               {today}
             </span>
             <div className="admin-user-chip">
-              <div className="admin-user-avatar">
-                {profile?.full_name?.charAt(0).toUpperCase() || 'D'}
-              </div>
+              <ProfilePhoto className="admin-user-avatar" />
               <div>
                 <strong>{profile?.full_name || profile?.email}</strong>
                 <small>Doctor</small>

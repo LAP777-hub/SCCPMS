@@ -81,4 +81,5 @@ export type Profile = {
   created_at: string;
   updated_at: string;
   active?: boolean;
+  avatar_path?: string | null;
 };

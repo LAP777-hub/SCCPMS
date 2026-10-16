@@ -78,10 +78,24 @@ test('admin deletes an inactive staff login, views retained contact details and 
   await row.getByRole('button',{name:'Delete account',exact:true}).click();await page.getByRole('button',{name:'Delete permanently',exact:true}).click();
   await expect(row).toHaveCount(0);
   await page.locator('aside nav').getByRole('button',{name:'Records',exact:true}).click();await page.getByRole('button',{name:'View record'}).click();
+  await expect(page.getByRole('dialog',{name:'Realtime Doctor'})).toBeVisible();
   await expect(page.getByRole('link',{name:'doctor.fixture@gmail.com'}).first()).toHaveAttribute('href','mailto:doctor.fixture@gmail.com');
   await expect(page.getByRole('link',{name:'+27712345678'}).first()).toHaveAttribute('href','tel:+27712345678');
   await page.getByRole('button',{name:'Invite back to system'}).click();await expect(page.getByRole('status')).toContainText('Invitation sent');
   expect(state.writes).toEqual([`PATCH /api/staff/${ids.doctor}`,`DELETE /api/staff/${ids.doctor}`,`POST /api/account-records/${ids.doctor}/reinvite`]);
+});
+
+test('receptionist invitations offer only Reception / Front desk while doctors retain clinical departments',async({page})=>{
+  const state=fixture(); await open(page,'admin',state);
+  await page.locator('aside nav').getByRole('button',{name:'Doctors & Staff'}).click();
+  await page.getByRole('button',{name:'Invite receptionist',exact:true}).click();
+  const modal=page.locator('.admin-modal');
+  const department=modal.locator('select').first();
+  await expect(department.locator('option')).toHaveCount(1);
+  await expect(department).toHaveValue('Reception / Front desk');
+  await modal.getByRole('button',{name:'Doctor',exact:true}).click();
+  await expect(department.locator('option')).not.toHaveCount(1);
+  await expect(department.locator('option[value="Reception / Front desk"]')).toHaveCount(0);
 });
 
 test('reports display real zero states and preserve unapplied date edits while live data refreshes',async({page})=>{

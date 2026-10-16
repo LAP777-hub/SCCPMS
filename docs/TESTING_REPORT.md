@@ -1210,6 +1210,47 @@ Published [application commit](https://github.com/LAP777-hub/SCCPMS/commit/255e5
 and [successful final workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38836967389).
 This final evidence update changes documentation only.
 
+## 11k. Five-minute OTPs, residences, staff popups and profile photos — 16 October 2026
+
+The user requested delivery within one minute, a five-minute login code,
+separate calling-code selection, working residence search, Records popups,
+signup confirmation returning to login, staff invitation password popups,
+reception-only departments and profile-photo uploads. Administrator OTPs remain
+on Resend; non-admin codes and hosted Auth SMTP remain on Brevo.
+
+| Check or finding | Recorded result |
+| --- | --- |
+| Five-minute code configuration | Default and validated setting are exactly 300 seconds; local and Vercel production setting updated; the acknowledged server deadline drives the UI countdown |
+| Delivery target evidence | Read-only Brevo events for two prior setup messages show request-to-delivered intervals of **617ms** and **1626ms**; both below60 seconds. No new email sent by this check; this does not guarantee every recipient's inbox or prove a real non-admin OTP round trip |
+| Focused timing/provider/address regressions | **70/70 passed**, 18.590s; covers five-minute default, Brevo payload duration, acknowledgement timing, all published residence names and provider bounds/fallback |
+| Focused photo/department checks | **8/8 passed**, 6.725s; pixel decoding/re-encoding/metadata removal, input limits, own-user storage paths, persistence/audit, rollback cleanup, uncertain commit and reception department policy |
+| Real isolated migration/persistence checks | **2/2 passed**, no skips, 55.222s; migration027 photo path/reception constraints and idempotency; migration028 legacy pending retirement, accepted deadline cap, no extension of shorter codes, unchanged verified sessions and audit idempotency |
+| Live migrations | 027 and028 applied under the migration lock; ledger, photo column, receptionist mapping and legacy draft retirement verified. No clinical records or passwords changed |
+| Actual private Storage acceptance | Bucket configured privately with 2MB/WebP restrictions; real synthetic-object upload and signed download passed, unsigned public access denied, diagnostic object removed; no real user profile changed |
+| Initial full local server attempt | **390 total:382 passed, two failures, six opt-in DB skips**, 306.184s. One HTTP deadline test process stalled and was stopped; the other failure used an outdated receptionist fixture with a doctor specialty |
+| Server test correction | Receptionist fixture no longer supplies a clinical specialty. Deadline-test HTTP cleanup now closes the listener before destroying connections, unrefs the server and has a five-second test timeout; corrected registration/HTTP subset **20/20 passed**, 4.653s |
+| Second full local server attempt | **390 total:383 passed, zero assertion failures, one cancelled, six DB skips**, 263.168s. The same stalled-body check reached its five-second test timeout; its process remained active and was stopped. This is not recorded as a clean full pass or a proven cleanup-only problem |
+| Explicit email deadline | Native cancellation alone was insufficient in the intermittent test. Fetch and JSON consumption now race an explicit deadline, abort on timeout and retain safe unknown-delivery semantics. Two tests cover transports that ignore cancellation; timing/provider/OTP subset **53/53 passed**, 15.899s |
+| Final complete local backend rerun | **400 total:394 passed, six intentional opt-in DB skips, zero failures/cancellations**, 97.493s; includes the final deadline race and photo timeout guards |
+| Independent photo review | Found that late storage completions could send another response after a request timeout. Guarded responses and pre-upload/end checks added, acknowledged uploads still persist/clean up safely, and Storage fetch receives a ten-second cancellation deadline. Eight additional timeout/cancellation cases passed in the final full suite |
+| Independent phone review and correction | Foreign international prefixes could be rewritten under ZA, Italian significant zeroes were rejected, and formatted pastes could be clipped. Mismatched prefixes/letters now block submission with an explanation, significant foreign zeroes are retained and raw paste length is40. Final registration subset **15/15 passed**, 34.0s, including both new cases |
+| Initial browser attempt | Interrupted before cases ran because Playwright tried to clear the diagnostic-tools parent folder. Its output now uses `test-results/playwright`; private diagnostics remain ignored |
+| Full browser rerun | **112/112 passed**, 2.5minutes: signup confirmation/login for all patient categories, doctor/receptionist password popup, five-minute deadline, ZA number persistence, residence names without fake coordinates, address retry, Records modal, reception-only choices and all-role photo upload/reload |
+| Lint | Initial unused receptionist Avatar helper removed; rerun passed with zero errors. The existing Fast Refresh warning and `.eslintignore` notice remain |
+| Typechecks/builds | Frontend/backend typechecks and production builds passed; frontend fixture build16.78s |
+| Final fixture frontend build | Passed after phone correction, 20.42s; final lint/typechecks passed |
+
+Search combines the seven university halls and sixteen published off-campus
+names/clusters with the administrator's Ntabiseng Courts/Lawson additions and
+supplied spelling aliases. Catalogue names have no invented street address or
+map coordinates and retain manual-entry fallback. Photo uploads use the private
+own-user API and real Storage, not browser-only persistence. The invitation
+popup preserves validated callback/session gates and chosen-password login.
+
+The one-minute mail target remains dependent on provider and recipient delivery.
+Final hosted source/deployment and cloud regression results are recorded after
+publication; live human signup/invitation/OTP completion remains acceptance work.
+
 ## 12. Supporting documents
 
 - [Operations](../OPERATIONS.md)
@@ -1218,6 +1259,7 @@ This final evidence update changes documentation only.
 - [Auth email callbacks and hosted redirects](auth-email-links.md)
 - [Registration catalogue and NAS correction](academic-catalogue.md)
 - [Address provider configuration and limitations](residential-address-search.md)
+- [Private profile photos and storage](profile-photos.md)
 - [Historical university Resend DNS handoff](../RESEND_UNIVERSITY_DNS.md)
 - [Login session and port diagnostics](session-connectivity.md)
 - [GitHub/Vercel deployment](vercel-deployment.md)

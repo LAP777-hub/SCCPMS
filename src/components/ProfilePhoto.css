@@ -1,0 +1,7 @@
+.profile-photo-button { padding: 0; overflow: hidden; cursor: pointer; font: inherit; border: 1px solid rgba(255,255,255,.25); }
+.profile-photo-button:focus-visible { outline: 3px solid #ffb521; outline-offset: 3px; }
+.profile-photo-button img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.profile-photo-editor { display: grid; gap: 16px; color: #dbe4ee; }
+.profile-photo-editor label { display: grid; gap: 8px; }
+.profile-photo-editor input { max-width: 100%; }
+.profile-photo-editor .profile-photo-preview { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; }

@@ -5,6 +5,7 @@ import { FACULTIES, isValidFacultyProgramme } from '../lib/academicCatalogue';
 import ProgrammeCombobox from './ProgrammeCombobox';
 import ResidentialAddressInput, { type ResidentialAddressValue } from './ResidentialAddressInput';
 import PasswordToggle from './PasswordToggle';
+import RegistrationPhoneInput from './RegistrationPhoneInput';
 
 export default function RegistrationScreen({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
   const { signUp } = useAuth();
@@ -33,9 +34,9 @@ export default function RegistrationScreen({ onSwitchToLogin }: { onSwitchToLogi
         studentNumber: userType === 'Student' ? value('identityNumber') : undefined,
         staffNumber: userType !== 'Student' ? value('identityNumber') : undefined,
         department, program: userType === 'Student' ? programme : undefined, addressLine1: value('addressLine1'),
-        addressLatitude: residentialAddress.selection?.latitude,
-        addressLongitude: residentialAddress.selection?.longitude,
-        addressSource: residentialAddress.selection ? 'photon' : 'manual',
+        addressLatitude: residentialAddress.selection?.latitude ?? undefined,
+        addressLongitude: residentialAddress.selection?.longitude ?? undefined,
+        addressSource: residentialAddress.selection?.source === 'photon' ? 'photon' : 'manual',
       });
       if (result.error) setError(result.error);
       else setMessage(result.message || 'Account created. Sign in and enter the verification code sent to your email.');
@@ -56,7 +57,7 @@ export default function RegistrationScreen({ onSwitchToLogin }: { onSwitchToLogi
       <div className="fields-grid">
         <label className="field-group field-wide"><span className="field-label">Full name</span><span className="field-control"><input name="fullName" autoComplete="name" required minLength={2} maxLength={160} /></span></label>
         <label className="field-group"><span className="field-label">Email address</span><span className="field-control"><input name="email" type="email" autoComplete="email" required maxLength={254} /></span></label>
-        <label className="field-group"><span className="field-label">Phone (international format)</span><span className="field-control"><input name="phone" type="tel" autoComplete="tel" placeholder="+27123456789" pattern="\+[1-9][0-9]{7,14}" required /></span></label>
+        <RegistrationPhoneInput disabled={busy} />
         <label className="field-group"><span className="field-label">University affiliation</span><span className="field-control"><select value={userType} onChange={event => { setUserType(event.target.value); setProgramme(''); }}><option>Student</option><option>Lecturer</option><option>SPU Staff</option></select></span></label>
         <label className="field-group"><span className="field-label">{userType === 'Student' ? 'Student number' : 'Staff number'}</span><span className="field-control"><input name="identityNumber" key={userType} required maxLength={40} /></span></label>
         <div className="field-group"><label className="field-label" htmlFor="registration-department">Department</label><span className="field-control"><select id="registration-department" name="department" value={department} required={userType === 'Student'} onChange={event => { setDepartment(event.target.value); setProgramme(''); }}>

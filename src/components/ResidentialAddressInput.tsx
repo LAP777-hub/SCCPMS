@@ -2,8 +2,17 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { LoaderCircle, MapPin, Search } from 'lucide-react';
 import './ResidentialAddressInput.css';
 
-export type AddressSuggestion = { id: string; address: string; latitude: number; longitude: number; source: 'photon' };
+export type AddressSuggestion = { id: string; address: string; latitude: number | null; longitude: number | null; source: 'photon' | 'spu' | 'clinic' };
 export type ResidentialAddressValue = { text: string; selection: AddressSuggestion | null };
+
+function validSuggestion(value: unknown): value is AddressSuggestion {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as AddressSuggestion;
+  if (typeof item.id !== 'string' || item.id.length > 160 || typeof item.address !== 'string' || !item.address.trim() || item.address.length > 200) return false;
+  if (item.source === 'spu' || item.source === 'clinic') return item.latitude === null && item.longitude === null;
+  return item.source === 'photon' && typeof item.latitude === 'number' && Number.isFinite(item.latitude) && item.latitude >= -28.84 && item.latitude <= -28.60
+    && typeof item.longitude === 'number' && Number.isFinite(item.longitude) && item.longitude >= 24.65 && item.longitude <= 24.89;
+}
 
 export default function ResidentialAddressInput({ id, value, onChange, required, disabled }: {
   id: string; value: ResidentialAddressValue; onChange: (value: ResidentialAddressValue) => void;
@@ -14,6 +23,8 @@ export default function ResidentialAddressInput({ id, value, onChange, required,
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [active, setActive] = useState(-1);
+  const [retry, setRetry] = useState(0);
+  const [failed, setFailed] = useState(false);
   const version = useRef(0);
   const listId = `${id}-suggestions`;
   const helpId = `${id}-help`;
@@ -22,28 +33,33 @@ export default function ResidentialAddressInput({ id, value, onChange, required,
   useEffect(() => {
     const current = ++version.current;
     const controller = new AbortController();
-    setSuggestions([]); setActive(-1); setNotice(''); setLoading(false);
+    setSuggestions([]); setActive(-1); setNotice(''); setLoading(false); setFailed(false);
     if (!focused || disabled || value.selection || value.text.trim().length < 3) return () => controller.abort();
     const timer = window.setTimeout(async () => {
       setLoading(true);
+      let timedOut = false;
+      const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 10000);
       try {
         const apiUrl = import.meta.env.VITE_API_URL;
         if (!apiUrl) throw new Error('Address search is unavailable.');
         const response = await fetch(`${apiUrl.replace(/\/$/, '')}/registration/addresses?q=${encodeURIComponent(value.text.trim())}`, {
-          headers: { Accept: 'application/json' }, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
+          headers: { Accept: 'application/json' }, signal: controller.signal,
         });
         if (!response.ok) throw new Error('Address search is unavailable.');
-        const body = await response.json() as { data?: AddressSuggestion[] };
-        if (!Array.isArray(body.data)) throw new Error('Address search is unavailable.');
+        const body = await response.json() as { data?: AddressSuggestion[]; warning?: string };
+        if (!Array.isArray(body.data) || !body.data.every(validSuggestion)) throw new Error('Address search is unavailable.');
         if (current !== version.current) return;
         setSuggestions(body.data);
+        if (typeof body.warning === 'string') setNotice(body.warning.slice(0, 200));
         if (!body.data.length) setNotice('No matching map address found. Keep your manually entered residential address.');
       } catch {
-        if (!controller.signal.aborted && current === version.current) setNotice('Address search is temporarily unavailable. You can enter your residential address manually.');
-      } finally { if (current === version.current) setLoading(false); }
+        if ((!controller.signal.aborted || timedOut) && current === version.current) {
+          setNotice('Address search is temporarily unavailable. You can enter your residential address manually.'); setFailed(true);
+        }
+      } finally { window.clearTimeout(timeout); if (current === version.current) setLoading(false); }
     }, 700);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [value.text, value.selection, focused, disabled]);
+  }, [value.text, value.selection, focused, disabled, retry]);
 
   function choose(suggestion: AddressSuggestion) {
     ++version.current;
@@ -79,14 +95,16 @@ export default function ResidentialAddressInput({ id, value, onChange, required,
       {suggestions.map((suggestion, index) => <li key={suggestion.id} role="presentation">
         <button type="button" role="option" id={`${listId}-${index}`} aria-selected={active === index} tabIndex={-1}
           onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(index)} onClick={() => choose(suggestion)}>
-          <MapPin size={16} aria-hidden="true" /><span>{suggestion.address}</span>
+          <MapPin size={16} aria-hidden="true" /><span>{suggestion.address}{suggestion.source !== 'photon' && <small>{suggestion.source === 'spu' ? 'SPU housing list' : 'Clinic accommodation list'} · exact map location unavailable</small>}</span>
         </button>
       </li>)}
     </ul>}
     <p id={helpId} className="residential-help">Enter where you currently stay in Kimberley. Private accommodation and manual addresses are accepted.</p>
     <p className="residential-status" role="status" aria-live="polite">{loading ? 'Searching Kimberley addresses…' : notice}</p>
+    {failed && <button type="button" className="secondary-button" disabled={disabled} onClick={() => { setFocused(true); setRetry(value => value + 1); }}>Retry address search</button>}
     <div className="residential-attribution">
-      {value.selection && <a href={`https://www.openstreetmap.org/?mlat=${value.selection.latitude}&mlon=${value.selection.longitude}#map=17/${value.selection.latitude}/${value.selection.longitude}`} target="_blank" rel="noreferrer">View selected location</a>}
+      {value.selection?.source === 'photon' && <a href={`https://www.openstreetmap.org/?mlat=${value.selection.latitude}&mlon=${value.selection.longitude}#map=17/${value.selection.latitude}/${value.selection.longitude}`} target="_blank" rel="noreferrer">View selected location</a>}
+      {value.selection?.source === 'spu' && <a href="https://www.spu.ac.za/index.php/residences/" target="_blank" rel="noreferrer">SPU housing information</a>}
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
     </div>
   </div>;

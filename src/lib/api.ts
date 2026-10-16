@@ -23,7 +23,7 @@ export async function authenticatedFetch(path: string, init: RequestInit = {}): 
   const request = (session: Session | null) => {
     const headers = new Headers(init.headers);
     headers.set('Accept', 'application/json');
-    if (init.body) headers.set('Content-Type', 'application/json');
+    if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     if (session) headers.set('Authorization', `Bearer ${session.access_token}`);
     else headers.delete('Authorization');
     return fetch(`${apiUrl.replace(/\/$/, '')}${path}`, { ...init, headers, signal: init.signal ?? AbortSignal.timeout(30000) });

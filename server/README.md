@@ -42,7 +42,7 @@ Vercel uses the transaction pooler on port 6543, managed connection pooling, ret
 audit writes, PostgreSQL-backed request/provider budgets, and bounded SSE
 streams backed by migration 020. Local/container mode retains session LISTEN
 on port 5432. Apply migrations 020/021/022/023 before serving the new Vercel API.
-Login OTPs expire ten minutes after provider acceptance; failed resends retain a
+Login OTPs expire five minutes after provider acceptance; failed resends retain a
 valid code. A verified Resend sender and Supabase custom SMTP are needed for live
 mail. [Email configuration and acceptance](../docs/email-delivery.md).
 

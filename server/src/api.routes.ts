@@ -11,6 +11,7 @@ import { phoneSchema } from './phone.js';
 import { authCallbackUrl } from './auth-callback.js';
 import { deletePatientLoginAccount, PatientDeletionError } from './account-deletion.js';
 import { notifyClinicActivity } from './clinic-notifications.js';
+import { RECEPTION_DEPARTMENT, receptionDepartmentAllowed } from './staff-policy.js';
 
 const router = Router();
 const supabaseAdmin = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
@@ -316,7 +317,10 @@ export const staffSchema = z.object({
   phone: phoneSchema,
   department: z.string().trim().max(120).nullable().optional(),
   specialty: z.string().trim().max(120).nullable().optional(),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.role === 'receptionist' && !receptionDepartmentAllowed(value.department)) context.addIssue({ code: 'custom', path: ['department'], message: 'Receptionist department must be Reception / Front desk.' });
+  if (value.role === 'receptionist' && value.specialty) context.addIssue({ code: 'custom', path: ['specialty'], message: 'Specialty applies only to doctors.' });
+}).transform(value => ({ ...value, department: value.role === 'receptionist' ? RECEPTION_DEPARTMENT : value.department }));
 
 router.post('/staff', allowRoles('admin'), async (req, res) => {
   const parsed = staffSchema.safeParse(req.body);
@@ -761,6 +765,10 @@ async function updateAccount(
   const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserById(id.data);
   if (error || authError) return res.status(503).json({ error: 'Unable to verify this account.' });
   const targetRole = authUser.user?.app_metadata.clinic_role ?? profile?.role;
+  if (targetRole === 'receptionist') {
+    if (!receptionDepartmentAllowed(body.data.department) || body.data.specialty !== undefined) return res.status(400).json({ error: 'Receptionist department must be Reception / Front desk; specialty applies only to doctors.' });
+    if ('department' in body.data) body.data.department = RECEPTION_DEPARTMENT;
+  }
   if (
     !profile ||
     !(family === 'staff' ? ['doctor', 'receptionist'] : patientRoles).includes(targetRole)

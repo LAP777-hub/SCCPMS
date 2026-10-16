@@ -30,7 +30,7 @@ async function mockEmailFlow(page: Page, role = 'doctor') {
     verifyLinkCount: 0, passwordUpdates: [] as Record<string, unknown>[],
     passwordLogins: [] as Record<string, unknown>[], authLogoutCount: 0, apiLogoutCount: 0,
     otpSendCount: 0, otpVerifyCount: 0, statusCount: 0,
-    validitySeconds: 600, cooldownSeconds: 30,
+    validitySeconds: 300, cooldownSeconds: 30,
     activeChallenges: new Map<string, Challenge>(), verifiedSessions: new Set<string>(),
     sendGate: undefined as Promise<void> | undefined,
     statusGate: undefined as Promise<void> | undefined,
@@ -170,6 +170,10 @@ for (const role of ['doctor', 'receptionist']) {
     expect(new URL(page.url()).search).toBe('');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Set your password' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Set your password' })).toBeVisible();
+    await expect(page.getByLabel('New Password', { exact: true })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Set your password' })).toBeVisible();
     expect(fixture.state.verifyLinkCount).toBe(1);
     expect(fixture.state.otpSendCount).toBe(0);
     await setPassword(page);
@@ -222,8 +226,8 @@ test('protected links reject other providers, redirects, actions, duplicate toke
   expect(fixture.state.passwordUpdates).toEqual([]);
 });
 
-test('a signup email wrapper accepts the Supabase email type and returns to credentials without bypassing OTP', async ({ page }) => {
-  const fixture = await mockEmailFlow(page, 'patient');
+for (const role of ['patient', 'student', 'lecturer', 'staff']) test(`${role} signup verification returns to the login page without bypassing OTP`, async ({ page }) => {
+  const fixture = await mockEmailFlow(page, role);
   await learnProviderOrigin(page);
   const origin = new URL(page.url()).origin;
   const verification = new URL('/auth/v1/verify', fixture.state.providerOrigin);
@@ -234,7 +238,7 @@ test('a signup email wrapper accepts the Supabase email type and returns to cred
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible();
   await expect(page.getByRole('status')).toContainText('Your email is confirmed. Sign in with your password');
-  await expect(page.getByLabel('Email Address')).toHaveValue('patient@spu.ac.za');
+  await expect(page.getByLabel('Email Address')).toHaveValue(`${role}@spu.ac.za`);
   await expect(page.locator('.patient-shell,.doctor-shell,.reception-shell')).toHaveCount(0);
   expect(fixture.state.verifyLinkCount).toBe(1);
   expect(fixture.state.otpSendCount).toBe(0);
@@ -359,7 +363,7 @@ test('an older status response without a challenge cannot erase a newer accepted
   fixture.state.cooldownSeconds = 0;
   await page.goto('/');
   await credentials(page);
-  await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 10:00.');
+  await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 5:00.');
   fixture.state.activeChallenges.clear();
   const oldStatus = gate();
   fixture.state.statusGate = oldStatus.promise;
@@ -368,15 +372,30 @@ test('an older status response without a challenge cannot erase a newer accepted
     await expect.poll(() => fixture.state.statusCount).toBe(1);
     await expect(page.getByRole('button', { name: 'Verify & Sign In' })).toBeDisabled();
     await page.getByRole('button', { name: 'Resend code', exact: true }).click();
-    await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 10:00.');
+    await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 5:00.');
     const response = page.waitForResponse(candidate => new URL(candidate.url()).pathname === '/auth/otp/status');
     oldStatus.release();
     await (await response).finished();
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
-    await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 10:00.');
+    await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 5:00.');
     await expect(page.getByRole('button', { name: 'Verify & Sign In' })).toBeEnabled();
     expect(fixture.state.otpSendCount).toBe(2);
   } finally { oldStatus.release(); }
+});
+
+test('five-minute codes expire at the server deadline and cannot be submitted after five minutes', async ({ page }) => {
+  await page.clock.install({ time: new Date() });
+  const fixture = await mockEmailFlow(page);
+  await page.goto('/'); await credentials(page);
+  await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 5:00.');
+  await page.getByLabel('6-Digit Code').fill('123456');
+  await expect(page.getByRole('button', { name: 'Verify & Sign In' })).toBeEnabled();
+  await page.clock.fastForward(299000);
+  await expect(page.getByTestId('otp-expiry')).toHaveText('Code expires in 0:01.');
+  await page.clock.fastForward(1000);
+  await expect(page.getByTestId('otp-expiry')).toHaveText('This code has expired. Request a new code.');
+  await expect(page.getByRole('button', { name: 'Verify & Sign In' })).toBeDisabled();
+  expect(fixture.state.otpVerifyCount).toBe(0);
 });
 
 test('expired codes and an explicit no-active-challenge resend error disable verification without inventing a new timer', async ({ page }) => {

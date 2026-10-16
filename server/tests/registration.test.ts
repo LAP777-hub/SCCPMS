@@ -25,7 +25,7 @@ test('all registration and invitation paths accept valid personal, university an
   for (const email of ['student.name@gmail.com', 'patient@outlook.com', 'patient@yahoo.com', 'clinician@clinic-fixture.co.za', 'test123@spu.ac.za', 'test123@students.spu.ac.za']) {
     assert.equal(registrationSchema.safeParse({ ...patient,email }).success,true, email);
     assert.equal(patientSchema.safeParse({ ...invitedPatient,email }).success,true, email);
-    for (const role of ['doctor', 'receptionist']) assert.equal(staffSchema.safeParse({ email,role,fullName:'Test Doctor',phone:patient.phone,specialty:'General Medicine' }).success,true, role);
+    for (const role of ['doctor', 'receptionist']) assert.equal(staffSchema.safeParse({ email,role,fullName:'Test Doctor',phone:patient.phone,...(role === 'doctor' ? { specialty:'General Medicine' } : {}) }).success,true, role);
   }
 });
 

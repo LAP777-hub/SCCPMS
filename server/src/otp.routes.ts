@@ -100,6 +100,7 @@ router.post('/send', async (req, res) => {
       const delivery = await sendOtpEmail(email, challengeCode(identity, lease.id), lease.id, config, lease.validitySeconds, {}, { userId, role: req.auth!.role, email, senderFrom: lease.senderFrom, provider: selectOtpEmailDelivery(req.auth!).provider });
       messageId = delivery.messageId;
       acknowledgedAt = new Date();
+      logger.info('OTP email accepted by provider', { requestId: req.id, provider: selectOtpEmailDelivery(req.auth!).provider, durationMs: delivery.providerDurationMs });
     }
   } catch (error) {
     const reason = error instanceof EmailDeliveryError ? error.reason : 'database';

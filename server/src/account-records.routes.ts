@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { RECEPTION_DEPARTMENT } from './staff-policy.js';
 import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { allowRoles } from './auth.js';
@@ -76,7 +77,7 @@ router.post('/account-records/:id/reinvite', async (req, res) => {
     await client.query(`INSERT INTO profiles(id,email,role,full_name,phone,user_type,student_number,staff_number,department,program)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(id) DO UPDATE SET email=EXCLUDED.email,role=EXCLUDED.role,full_name=EXCLUDED.full_name,phone=EXCLUDED.phone,
       user_type=EXCLUDED.user_type,student_number=EXCLUDED.student_number,staff_number=EXCLUDED.staff_number,department=EXCLUDED.department,program=EXCLUDED.program`,
-      [createdId,email,role,profile.full_name,profile.phone,profile.user_type,profile.student_number,profile.staff_number,profile.department,profile.program]);
+      [createdId,email,role,profile.full_name,profile.phone,profile.user_type,profile.student_number,profile.staff_number,role === 'receptionist' ? RECEPTION_DEPARTMENT : profile.department,profile.program]);
     if (role === 'doctor') {
       await client.query('INSERT INTO clinic_doctors(user_id,full_name,specialty,department,active) VALUES($1,$2,$3,$4,true)', [createdId,profile.full_name,specialty,profile.department]);
     }
