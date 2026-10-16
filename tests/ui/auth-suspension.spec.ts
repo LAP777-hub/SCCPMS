@@ -1,3 +1,4 @@
+import { emptyOverview } from './admin-overview-fixture';
 import { Buffer } from 'node:buffer';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -105,7 +106,8 @@ async function mockServices(page: Page) {
       }
       if (path === '/api/events') return route.fulfill({ status: 503, json: { error: 'Fixture uses polling.' } });
       if (path === '/api/clinic/settings') return route.fulfill({ json: { data: { timezone: 'Africa/Johannesburg', opens_at: '08:00:00', closes_at: '17:00:00', default_appointment_minutes: 30, minimum_reschedule_notice_hours: 2 } } });
-      if (path === '/api/analytics') return route.fulfill({ json: { data: { patients: 0, doctors: 0, staff: 0, appointmentsToday: 0, pendingAppointments: 0, activeWalkIns: 0, clinicalVisits: 0, pendingLeaveRequests: 0, dailyAppointments: [] } } });
+      if (path === '/api/admin/overview') return route.fulfill({ json: { data: emptyOverview() } });
+    if (path === '/api/analytics') return route.fulfill({ json: { data: { patients: 0, doctors: 0, staff: 0, appointmentsToday: 0, pendingAppointments: 0, activeWalkIns: 0, clinicalVisits: 0, pendingLeaveRequests: 0, dailyAppointments: [] } } });
       return route.fulfill({ json: { data: [] } });
     }
     if (url.origin === 'http://127.0.0.1:5178') return route.continue();

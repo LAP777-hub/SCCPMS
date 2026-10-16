@@ -1,3 +1,4 @@
+import { emptyOverview } from './admin-overview-fixture';
 import { Buffer } from 'node:buffer';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -96,11 +97,7 @@ async function mockClinic(page: Page) {
       if (state.unavailablePaths.has(path)) return route.fulfill({ status: 503, json: { error: 'Clinic service temporarily unavailable.' } });
       state.successfulRequests.push({ path, token: authorization });
       if (path === '/api/clinic/settings') return route.fulfill({ json: { data: settings } });
-      if (path === '/api/analytics') return route.fulfill({ json: { data: {
-        patients: state.patients, doctors: 0, staff: 0, appointmentsToday: 0,
-        pendingAppointments: 0, activeWalkIns: 0, clinicalVisits: 0,
-        pendingLeaveRequests: 0, dailyAppointments: [],
-      } } });
+      if (path === '/api/admin/overview') return route.fulfill({ json: { data: emptyOverview(state.patients) } });
       return route.fulfill({ json: { data: [] } });
     }
     if (url.origin === 'http://127.0.0.1:5178') return route.continue();
@@ -154,7 +151,7 @@ async function openDashboard(page: Page, navigate = true, loginEmail = email) {
   await expect(page.getByRole('heading', { name: 'Clinic Overview' })).toBeVisible();
   await expect(patientCount(page)).toHaveText('0');
 }
-const patientCount = (page: Page) => page.locator('.admin-stat-card').filter({ hasText: 'Active patients' }).locator('strong');
+const patientCount = (page: Page) => page.getByRole('article', { name: 'Total Patients', exact: true }).locator('.ao-stat-value');
 async function expectStillSignedIn(page: Page, state: Awaited<ReturnType<typeof mockClinic>>['state']) {
   await expect(page.locator('.admin-shell')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toHaveCount(0);
@@ -167,13 +164,13 @@ test('an expired access token refreshes and retries its API request without logg
   const clinic = await mockClinic(page);
   await openDashboard(page);
   const expiredToken = clinic.currentAccessToken();
-  clinic.expireAccessToken(['/api/analytics']);
+  clinic.expireAccessToken(['/api/admin/overview']);
   clinic.state.patients = 3;
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(patientCount(page)).toHaveText('3');
   expect(clinic.state.refreshCount).toBe(1);
-  expect(clinic.state.rejectedRequests).toEqual([{ path: '/api/analytics', token: `Bearer ${expiredToken}` }]);
-  expect(clinic.state.successfulRequests.some(request => request.path === '/api/analytics' && request.token === `Bearer ${clinic.currentAccessToken()}`)).toBe(true);
+  expect(clinic.state.rejectedRequests).toEqual([{ path: '/api/admin/overview', token: `Bearer ${expiredToken}` }]);
+  expect(clinic.state.successfulRequests.some(request => request.path === '/api/admin/overview' && request.token === `Bearer ${clinic.currentAccessToken()}`)).toBe(true);
   const claims = JSON.parse(Buffer.from(clinic.currentAccessToken().split('.')[1], 'base64url').toString());
   expect(claims).toMatchObject({ sub: userId, session_id: sessionId });
   await expectStillSignedIn(page, clinic.state);
@@ -242,7 +239,7 @@ test('a failed SDK token renewal preserves credentials and never sends anonymous
 test('a transient API outage preserves the dashboard and recovers without another login', async ({ page }) => {
   const clinic = await mockClinic(page);
   await openDashboard(page);
-  clinic.state.unavailablePaths.add('/api/analytics');
+  clinic.state.unavailablePaths.add('/api/admin/overview');
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Clinic service temporarily unavailable.');
   await expectStillSignedIn(page, clinic.state);
@@ -275,7 +272,7 @@ test('the sidebar Sign Out button ends verification and stays signed out after r
 test('a delayed invalid response from the previous account cannot logout or replay under a new account', async ({ page }) => {
   const clinic = await mockClinic(page);
   await openDashboard(page);
-  clinic.expireAccessToken(['/api/analytics']);
+  clinic.expireAccessToken(['/api/admin/overview']);
   const release = clinic.holdRejection();
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(() => clinic.state.rejectedRequests.length).toBe(1);
@@ -285,7 +282,7 @@ test('a delayed invalid response from the previous account cannot logout or repl
   await openDashboard(page, false, 'second-admin@example.invalid');
   await expect(page.locator('.admin-user-chip')).toContainText('Second Session Test Administrator');
   const requestsBeforeRelease = clinic.state.successfulRequests.length;
-  const oldResponse = page.waitForResponse(response => response.url().endsWith('/api/analytics') && response.status() === 401);
+  const oldResponse = page.waitForResponse(response => response.url().endsWith('/api/admin/overview') && response.status() === 401);
   release();
   await (await oldResponse).finished();
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
@@ -302,14 +299,14 @@ test('a delayed verification error cannot revoke a fresh OTP for the same user a
   const clinic = await mockClinic(page);
   await openDashboard(page);
   const originalToken = clinic.currentAccessToken();
-  clinic.state.otpRequiredPaths.add('/api/analytics');
-  const release = clinic.holdOtpResponse('/api/analytics');
+  clinic.state.otpRequiredPaths.add('/api/admin/overview');
+  const release = clinic.holdOtpResponse('/api/admin/overview');
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(() => clinic.state.otpRequiredRequests.length).toBe(1);
 
   // A second, current request requires verification while the older response
   // remains in flight. Completing that OTP keeps this Supabase session/token.
-  clinic.state.otpRequiredPaths.delete('/api/analytics');
+  clinic.state.otpRequiredPaths.delete('/api/admin/overview');
   clinic.state.otpRequiredPaths.add('/api/doctors');
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByRole('heading', { name: 'Verify Your Identity' })).toBeVisible();
@@ -323,7 +320,7 @@ test('a delayed verification error cannot revoke a fresh OTP for the same user a
   await expect(patientCount(page)).toHaveText('7');
   expect(clinic.currentAccessToken()).toBe(originalToken);
 
-  const oldResponse = page.waitForResponse(response => response.url().endsWith('/api/analytics') && response.status() === 428);
+  const oldResponse = page.waitForResponse(response => response.url().endsWith('/api/admin/overview') && response.status() === 428);
   release();
   await (await oldResponse).finished();
   await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));

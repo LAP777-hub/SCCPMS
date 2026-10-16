@@ -15,9 +15,9 @@ const emptyPatient: PatientForm = { fullName: '', phone: '', userType: 'Student'
 const message = (error: unknown) => error instanceof Error ? error.message : 'The change could not be saved. Please try again.';
 const canConfirm = (appointment: ClinicAppointment) => appointment.status === 'pending' && new Date(appointment.ends_at || appointment.starts_at).getTime() > Date.now();
 
-export function PatientsView({ patients, admin = false, onSaved }: { patients: ClinicPatient[]; admin?: boolean; onSaved: () => Promise<void> }) {
-  const [query, setQuery] = useState('');
-  const [editing, setEditing] = useState<ClinicPatient | 'new' | null>(null);
+export function PatientsView({ patients, admin = false, onSaved, initialCreate = false, initialSearch = '' }: { patients: ClinicPatient[]; admin?: boolean; onSaved: () => Promise<void>; initialCreate?: boolean; initialSearch?: string }) {
+  const [query, setQuery] = useState(initialSearch);
+  const [editing, setEditing] = useState<ClinicPatient | 'new' | null>(initialCreate ? 'new' : null);
   const [form, setForm] = useState(emptyPatient);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -146,9 +146,9 @@ export function AppointmentBooking({ doctors, patients, appointment, timezone, o
   </form>;
 }
 
-export function AppointmentsView({ appointments, doctors, patients, timezone = 'Africa/Johannesburg', onSaved }: { appointments: ClinicAppointment[]; doctors: ClinicDoctor[]; patients: ClinicPatient[]; timezone?: string; onSaved: () => Promise<void> }) {
-  const [booking, setBooking] = useState<ClinicAppointment | 'new' | null>(null);
-  const [query, setQuery] = useState('');
+export function AppointmentsView({ appointments, doctors, patients, timezone = 'Africa/Johannesburg', onSaved, initialCreate = false, initialSearch = '' }: { appointments: ClinicAppointment[]; doctors: ClinicDoctor[]; patients: ClinicPatient[]; timezone?: string; onSaved: () => Promise<void>; initialCreate?: boolean; initialSearch?: string }) {
+  const [booking, setBooking] = useState<ClinicAppointment | 'new' | null>(initialCreate ? 'new' : null);
+  const [query, setQuery] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

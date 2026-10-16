@@ -1261,6 +1261,42 @@ and [successful workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/3890
 Live human signup/invitation/OTP completion remains acceptance work. This final
 evidence update changes documentation only.
 
+## 11l. Admin overview from the supplied dashboard reference — 16 October 2026
+
+The requested overview has four statistic cards with actual seven-date
+sparklines; a Monday–Sunday appointments chart, recent bookings and today's
+timeline; and demographics, financial statistics, quick actions and notifications
+below. Existing SPU branding, registration, invitation, account and scheduling
+workflows remain in use. No operational sample data is seeded.
+
+| Check or finding | Recorded result |
+| --- | --- |
+| Administrator overview endpoint | New admin-only, OTP-protected, no-store endpoint; one SQL snapshot covers totals, date series, demographic groups and appointment lists |
+| Metric definitions | Patients/doctors count active nondeleted accounts; appointments include retained cancelled bookings; medical records count clinical encounters once; chart dates use the saved clinic timezone |
+| Focused authorization/error checks | **5/5 passed**, 12.398s; unauthenticated/non-admin denial, OTP requirement, no-store success, settings failure and safe database outage |
+| Real isolated SQL regression | **1/1 passed**, no skips, 9.776s; empty database, seven zero dates, Monday/Sunday bounds, active demographic classification, suspended/deleted/pending exclusions, retained medical history and an extreme UTC+14 clinic date; private schema removed |
+| Production data consistency read | Read-only at21:31SAST: **7 active patients, 2 doctors, 0 appointments, 0 medical records**; demographic sum matches the patient total, four series each contain seven dates, and the week starts on Monday. No names/contact data or clinical content printed |
+| Financial source inspection | No income/expense ledger exists in the current backend/schema. The financial panel explicitly displays unavailable totals rather than inventing amounts or presenting unknown finances as measured zero revenue |
+| Initial frontend lint | Two obsolete overview imports were unused; removed. Final lint has zero errors, with the pre-existing Fast Refresh warning and `.eslintignore` notice retained |
+| Initial build size finding | Eager overview code increased the entry script to512.12kB, triggering the standard500kB advisory. Lazy-loading the new overview reduces the entry to**498.68kB /133.93kB gzip**; overview code is14.09kB /4.28kB gzip; final fixture build passed in1.85s |
+| Initial focused browser run | **5 passed, 2 failed**, 1.3minutes. Zero/populated statistics, polling/error recovery, preserved patient form and quick/search actions passed. Two mobile checks timed out trying to use the obscured header menu toggle while the drawer was open |
+| Mobile correction | Added an explicit Close menu button within the sidebar; mobile tests now use the visible close control. No forced clicks or disabled interaction checks |
+| Desktop visual review | Actual browser screenshot reviewed against the reference; four top cards, three middle panels and four lower panels present. The empty chart is flat at zero and the empty donut has no fabricated segments |
+| Complete local backend regression | **406 total:399 passed, seven intentional opt-in database skips, zero failures/cancellations**, 97.911s |
+| Final full local browser regression | **121/121 passed**, 2.7minutes; includes the corrected mobile drawer, empty/populated overview, actual15-second polling, outage recovery, preserved unsaved form, existing quick-action forms, real-shaped search, desktop/tablet/mobile grids and all prior role/session/email/profile checks |
+| Final typechecks/builds | Frontend no-emit TypeScript, backend TypeScript/build and frontend production fixture build passed |
+| Publication scan | **518 indexed files, zero findings**; environments, diagnostic logs and screenshots remain ignored |
+
+The existing15-second polling/live-event mechanism updates the data in place.
+Opening a new appointment or patient form uses the existing workflow directly;
+background updates do not change its component identity or discard its fields.
+Search opens the real patient/staff directory with the selected account filter.
+
+No real accounts, appointments or clinical records were created or modified for
+this overview validation. The isolated database fixture is kept separate from
+the production consistency read. Hosted release results are recorded after
+publication.
+
 ## 12. Supporting documents
 
 - [Operations](../OPERATIONS.md)
@@ -1270,6 +1306,7 @@ evidence update changes documentation only.
 - [Registration catalogue and NAS correction](academic-catalogue.md)
 - [Address provider configuration and limitations](residential-address-search.md)
 - [Private profile photos and storage](profile-photos.md)
+- [Admin overview metric definitions and refresh behavior](admin-dashboard-overview.md)
 - [Historical university Resend DNS handoff](../RESEND_UNIVERSITY_DNS.md)
 - [Login session and port diagnostics](session-connectivity.md)
 - [GitHub/Vercel deployment](vercel-deployment.md)

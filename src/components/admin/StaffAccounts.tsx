@@ -7,11 +7,12 @@ type Props = {
   staff: ClinicStaff[];
   onSaved: () => Promise<void>;
   onInvite: (role: 'doctor' | 'receptionist') => void;
+  initialSearch?: string;
 };
 const message = (error: unknown) => error instanceof Error ? error.message : 'Unable to save this change.';
 
-export default function StaffAccounts({ staff, onSaved, onInvite }: Props) {
-  const [query, setQuery] = useState('');
+export default function StaffAccounts({ staff, onSaved, onInvite, initialSearch = '' }: Props) {
+  const [query, setQuery] = useState(initialSearch);
   const [editing, setEditing] = useState<ClinicStaff | null>(null);
   const [deactivating, setDeactivating] = useState<ClinicStaff | null>(null);
   const [deleting, setDeleting] = useState<ClinicStaff | null>(null);

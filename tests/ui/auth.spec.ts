@@ -1,3 +1,4 @@
+import { emptyOverview } from './admin-overview-fixture';
 import { test, expect, type Page } from '@playwright/test';
 
 const id = '00000000-0000-4000-8000-000000000001';
@@ -33,6 +34,7 @@ async function mockServices(page: Page, role: string, deliveryFails = false, pho
     if (path === '/auth/otp/verify') { verified = true; return route.fulfill({ json: { message: 'Verified' } }); }
     if (path === '/api/events') return route.fulfill({ status: 503, json: { error: 'Polling fallback in browser tests' } });
     if (path === '/api/clinic/settings') return route.fulfill({ json: { data: settings } });
+    if (path === '/api/admin/overview') return route.fulfill({ json: { data: emptyOverview() } });
     if (path === '/api/analytics') return route.fulfill({ json: { data: { patients:0,doctors:0,staff:0,appointmentsToday:0,pendingAppointments:0,activeWalkIns:0,clinicalVisits:0,pendingLeaveRequests:0,dailyAppointments:[] } } });
     return route.fulfill({ json: { data: [] } });
   });
@@ -189,11 +191,11 @@ test('wrong OTP keeps the verification form available for another attempt', asyn
 test('empty admin analytics are zero and incoming changes refresh database totals', async ({ page }) => {
   await mockServices(page,'admin');
   let patients=0;
-  await page.route('**/localhost:4000/api/analytics',route=>route.fulfill({json:{data:{patients,doctors:0,staff:0,appointmentsToday:0,pendingLeaveRequests:0,dailyAppointments:[]}}}));
+  await page.route('**/localhost:4000/api/admin/overview',route=>route.fulfill({json:{data:emptyOverview(patients)}}));
   await signIn(page,'admin');await page.getByLabel('6-Digit Code').fill('123456');await page.getByRole('button',{name:'Verify & Sign In'}).click();
-  const patientStat=page.locator('.admin-stat-card').filter({hasText:'Active patients'});
+  const patientStat=page.getByRole('article',{name:'Total Patients',exact:true});
   await expect(patientStat.locator('strong')).toHaveText('0');
-  await expect(page.getByText('No appointment activity yet.')).toBeVisible();
+  await expect(page.getByText('No appointments this week.')).toBeVisible();
   patients=4;
   await page.evaluate(()=>window.dispatchEvent(new CustomEvent('clinic:data-changed',{detail:{table:'profiles',remote:true}})));
   await expect(patientStat.locator('strong')).toHaveText('4');
