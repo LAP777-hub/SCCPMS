@@ -2,7 +2,7 @@
 
 **Report date:** 17 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
-**Status:** the admin overview release is published at application commit `c4a20ca`, and both Vercel projects were verified READY for that exact commit. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38955867246) passed **399 server checks with seven intentional unit-command database skips**, **seven separate real PostgreSQL cases**, **121 browser cases**, builds, typechecks and security checks. **9/9 deployed HTTP checks** and **7/7 live overview/asset/protection checks** passed. Earlier **10/10 live address searches**, **8/8 live desktop/mobile email-wrapper checks** and two delivered Brevo API/Supabase SMTP setup messages remain separate evidence. Migrations 027/028 remain applied; login OTP lifetime is five minutes. Sections 11h–11l preserve release history, failed attempts, corrections and remaining real-user acceptance work.
+**Status:** the centred-popup and five-megabyte photo release is published at application commit `63e438b`, and both Vercel projects were verified READY for that exact commit. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38997677617) passed **412 server checks with seven intentional unit-command database skips**, **seven separate real PostgreSQL cases**, **132 browser cases**, builds, typechecks and security checks. **9/9 deployed HTTP checks** and **8/8 live photo/popup/asset/protection checks** passed. Earlier overview, address, email-wrapper and delivered setup-email checks remain separate evidence. Migrations 027/028 remain applied; login OTP lifetime is five minutes. Sections 11h–11m preserve release history, failed attempts, corrections and remaining real-user acceptance work.
 
 All valid recipient emails are accepted. The SPU sender plan remains canceled.
 Brevo API/SMTP credentials have now been supplied and saved privately. New
@@ -50,11 +50,11 @@ These are completed results available when this report was assembled. Counts fro
 | Frontend TypeScript/build | Passed | Latest production frontend build and separate typecheck completed |
 | Frontend lint | Passed with zero errors | One existing `react-refresh/only-export-components` warning and an `.eslintignore` deprecation notice remain |
 | Server TypeScript/build | Passed | Latest successful TypeScript build also checks API types; separate no-emit typecheck passed at the earlier baseline |
-| Latest completed cloud server unit run | **406 total: 399 passed, 7 skipped, 0 failed or cancelled** | Node 22; seven real database cases opt in; final workflow for `c4a20ca`, 59.651s |
+| Latest completed cloud server unit run | **419 total: 412 passed, 7 skipped, 0 failed or cancelled** | Node 22; seven real database cases opt in; final workflow for `63e438b`, 60.855s |
 | Earlier completed server baseline | **167 total: 165 passed, 2 skipped, 0 failed** | Historical callback baseline; its two separate database suites passed |
 | Latest focused trusted Auth checks | **28 passed, 0 skipped, 0 failed** | Rechecked after final diagnostic changes; safe stage/timeout logging, provider bans and transient/permanent auth failures |
 | Earlier isolated database command | **2 suites passed** | Clinic workflows and registration persistence; unique temporary schemas cleaned up |
-| Latest stable isolated database command | **7/7 passed, 0 skipped, 0 failed or cancelled** | GitHub Linux/PostgreSQL CI for `c4a20ca`, 5.375s; includes the new admin overview aggregate/clinic-date/zero-state checks and existing deletion/history, OTP, profile, ownership and shared-budget cases; earlier failures retained |
+| Latest stable isolated database command | **7/7 passed, 0 skipped, 0 failed or cancelled** | GitHub Linux/PostgreSQL CI for `63e438b`, 5.741s; includes admin overview aggregate/clinic-date/zero-state checks and existing deletion/history, OTP, profile, ownership and shared-budget cases; earlier failures retained |
 | Completed browser baseline | **55 cases verified: 54 passed initially; 1 passed on isolated rerun** | First full command had one timeout; the report does not describe that command as an uninterrupted 55-pass run |
 | Main responsive dashboard matrix | **184 views passed** | 30 sections × 6 viewports = 180, plus four landscape overviews; no document overflow or runtime errors |
 | Short/mobile/landscape drawers | **12 checks passed** | Four roles × three sizes; final navigation item and Sign Out reachable; logos loaded |
@@ -67,6 +67,7 @@ These are completed results available when this report was assembled. Counts fro
 | Deployed runtime connectivity | **9/9 live HTTP checks passed** | Frontend/API/database health 200; invitation callback, protected GET/POST/PUT rejection, production CORS and JSON404; campus-network failures remain historical/local evidence in sections 11b/11d |
 | Live Kimberley address/residence searches | **10/10 passed** | Real Long Street/New Park coordinates plus eight catalogue/alias results; catalogue-only names retain null coordinates and manual entry |
 | Deployed admin overview checks | **7/7 passed** | Correct production API origin, header/search, separate overview bundle, empty/unavailable states, unauthenticated denial and production CORS |
+| Deployed photo/popup checks | **8/8 passed** | Four image actions, 5 MB allowance, selected/enlarged previews, centred-dialog styles, bounded image preparation and protected/CORS-enabled removal |
 | Hosted development redirect routing | Passed | Saved/read back 5173; default/signup/invite/recovery HTTP 303 probes resolve to the development frontend |
 | Resend key/domain API | Passed key acceptance | Authenticated read-only domain lookup succeeded; this is not delivery acceptance |
 | Former university sending domain | **Canceled; historical setup only** | `clinic.spu.ac.za` was prepared but unverified; the active verified Brevo sender now supports general delivery |
@@ -76,7 +77,7 @@ These are completed results available when this report was assembled. Counts fro
 | Earlier account-release browser attempt | **67 total: 59 passed, 8 failed initially** | 1.8 minutes; two outdated disabled-account callback expectations and six ambiguous Patients-heading selectors; original failures retained |
 | Latest focused browser correction | **9/9 passed in 11.6s** | Two callbacks plus all seven deletion cases; includes one deletion case already passed initially |
 | Earlier account-release distinct browser cases | **67 verified** | 59 initial passes plus eight corrected failures; that milestone was not an uninterrupted 67-pass full command |
-| Latest full browser run | **121 passed, 0 failed** | GitHub Linux CI for `c4a20ca`, 1.9 minutes; reference overview, actual15-second polling, quick actions/search, preserved forms, responsive layout and all previous role/session/email/photo cases |
+| Latest full browser run | **132 passed, 0 failed** | GitHub Linux CI for `63e438b`, 1.9 minutes; centred/scrolled popups, all-role photo upload/removal/reload, 5 MB boundary and encoding failure recovery, plus prior overview, role, session, email, Records and registration cases |
 | Added sign-in profile race checks | **2/2 passed** | Focused run after adding old403/mismatched-profile cases; 79 distinct current browser cases verified across the complete77 and focused2 commands |
 | Focused password visibility | **6 passed** | Independent masking, keyboard controls, values/FormData, validation, busy state and chosen passwords; exact accessible names strengthened for the final full run |
 | Fixed-pane and readable-text matrix | **128 views passed** | 28 authentication views and 100 dashboard views; 35 keyboard toggles and seven programme/address popup scenarios passed |
@@ -1330,11 +1331,19 @@ dialog is a separate standard dismissal control.
 | Complete local backend regression | **419 total: 412 passed, seven intentional opt-in database skips, zero failures or cancellations**, 99.377s |
 | Complete local browser regression | **132/132 passed**, 2.9 minutes; includes all new photo/popup cases and the encoder-failure recovery case, plus prior role, OTP, registration, overview, Records, reports and session workflows |
 | Publication scan | **521 indexed files, zero findings**; private configuration, provider responses and diagnostic artifacts remain ignored |
+| Final cloud regression | Exact application commit `63e438b`: **419 total / 412 server passes / seven intentional unit-command skips / zero failures or cancellations**, 60.855s; separate real PostgreSQL **7/7**, 5.741s; browser **132/132**, 1.9 minutes; frontend/backend builds, typechecks and security scan passed |
+| Final Vercel application release | Frontend and API both verified READY for exact commit `63e438b253ce296737c756df04958d20eeafb846` |
+| Final live photo/popup checks | **8/8 passed**, 17 October at 05:10 SAST: assets, four image actions, 5 MB source allowance, selected/large preview, native dialog centring styles, bounded image preparation, unauthenticated DELETE denial and production DELETE CORS |
+| Final existing runtime checks | **9/9 passed**, 17 October at 05:10 SAST: frontend, email callback route, API root, PostgreSQL health, protected photo GET/PUT and OTP POST denial, production CORS and JSON404 |
 
 No live profile image or account was changed by the automated photo tests. Real
 pixels are decoded in the browser/server fixtures; provider and profile writes
-are isolated mocks. Full regression and hosted release results follow after
-their commands complete.
+are isolated mocks. Published
+[application commit](https://github.com/LAP777-hub/SCCPMS/commit/63e438b253ce296737c756df04958d20eeafb846)
+and [successful cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38997677617).
+This final evidence update changes documentation only. The bucket limit update
+was a separate authorized configuration action; no actual profile was deleted
+or replaced for release acceptance.
 
 ## 12. Supporting documents
 
