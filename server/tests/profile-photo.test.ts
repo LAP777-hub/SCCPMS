@@ -3,7 +3,8 @@ import { afterEach, mock, test } from 'node:test';
 import type { Request, Response as ExpressResponse } from 'express';
 import sharp from 'sharp';
 import { pool } from '../src/db.js';
-import { boundedPhotoStorageFetch, getProfilePhoto, putProfilePhoto, prepareProfilePhoto, MAX_PHOTO_BYTES } from '../src/profile-photo.routes.js';
+import { requireAuth, requireOtp } from '../src/auth.js';
+import photoRouter, { boundedPhotoStorageFetch, deleteProfilePhoto, getProfilePhoto, putProfilePhoto, prepareProfilePhoto, MAX_PHOTO_BYTES } from '../src/profile-photo.routes.js';
 
 const userId = '00000000-0000-4000-8000-000000000201';
 const oldPath = `${userId}/00000000-0000-4000-8000-000000000202.webp`;
@@ -22,7 +23,7 @@ function response() {
   };
   return { result, res: res as unknown as ExpressResponse, close(flag: 'headersSent' | 'writableEnded' | 'destroyed' = 'headersSent') { res[flag] = true; } };
 }
-const request = (body?: Buffer, avatarPath: unknown = oldPath) => ({ body, auth: { userId, profile: { avatar_path: avatarPath } }, get: () => 'image/png' }) as unknown as Request;
+const request = (body?: Buffer, avatarPath: unknown = oldPath) => ({ body, headers: {}, auth: { userId, sessionId: '00000000-0000-4000-8000-000000000204', email: 'patient@spu.ac.za', role: 'patient', profile: { avatar_path: avatarPath } }, get: () => 'image/png' }) as unknown as Request;
 
 test('photos are decoded, resized, converted and stripped of metadata for each supported input', async () => {
   for (const format of ['png', 'jpeg', 'webp'] as const) {
@@ -39,6 +40,22 @@ test('invalid, oversized, unsupported or falsely labelled images are rejected', 
   }
   const oversizedPixels = await sharp({ create: { width: 4001, height: 4000, channels: 3, background: '#fff' } }).png().toBuffer();
   await assert.rejects(prepareProfilePhoto(oversizedPixels, 'image/png'));
+});
+
+test('real images above the former 2 MB limit are accepted through 5 MB and larger images are rejected', async () => {
+  assert.equal(MAX_PHOTO_BYTES, 5 * 1024 * 1024);
+  const large = await sharp({ create: { width: 1400, height: 1000, channels: 3, background: '#647d91' } }).png({ compressionLevel: 0 }).toBuffer();
+  assert.ok(large.length > 2 * 1024 * 1024 && large.length <= MAX_PHOTO_BYTES);
+  const output = await prepareProfilePhoto(large, 'image/png');
+  assert.ok(output.length < 2 * 1024 * 1024, 'stored reencoded content stays within the existing bucket limit');
+  assert.equal((await sharp(output).metadata()).width, 512);
+  const oversized = await sharp({ create: { width: 1800, height: 1100, channels: 3, background: '#647d91' } }).png({ compressionLevel: 0 }).toBuffer();
+  assert.ok(oversized.length > MAX_PHOTO_BYTES);
+  await assert.rejects(prepareProfilePhoto(oversized, 'image/png'));
+  const { result, res } = response();
+  await putProfilePhoto(request(oversized), res);
+  assert.equal(result.status, 422);
+  assert.match(result.body.error, /up to 5 MB/);
 });
 test('photo reads cannot sign another account path and empty photos need no storage request', async () => {
   const fetcher = mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected storage request'); });
@@ -62,11 +79,24 @@ function storageFixture(failUpload = false, beforeResponse?: (call: { method: st
   });
   return calls;
 }
-function databaseFixture(failAt?: 'UPDATE' | 'COMMIT') {
+function databaseFixture(failAt?: 'UPDATE' | 'COMMIT' | 'AUDIT', options: {
+  avatarPath?: unknown;
+  exists?: boolean;
+  commitBeforeFailure?: boolean;
+  beforeQuery?: (sql: string) => void | Promise<void>;
+} = {}) {
   const calls: Array<{ sql: string; values?: unknown[] }> = [];
+  let avatarPath = 'avatarPath' in options ? options.avatarPath : oldPath;
+  let stagedPath = avatarPath;
   mock.method(pool, 'connect', async () => ({ query: async (sql: string, values?: unknown[]) => {
-    calls.push({ sql, values }); if (failAt && sql.startsWith(failAt)) throw new Error('Fixture database outage');
-    return { rowCount: 1, rows: sql.startsWith('SELECT avatar_path') ? [{ avatar_path: oldPath }] : [] };
+    calls.push({ sql, values });
+    await options.beforeQuery?.(sql);
+    if (sql === 'COMMIT' && options.commitBeforeFailure) avatarPath = stagedPath;
+    if ((failAt === 'AUDIT' && sql.startsWith('INSERT INTO audit_events')) || (failAt && sql.startsWith(failAt))) throw new Error('Fixture database outage');
+    if (sql === 'BEGIN' || sql === 'ROLLBACK') stagedPath = avatarPath;
+    if (sql.startsWith('UPDATE profiles')) stagedPath = sql.includes('avatar_path=NULL') ? null : values?.[1];
+    if (sql === 'COMMIT') avatarPath = stagedPath;
+    return { rowCount: options.exists === false && sql.startsWith('SELECT avatar_path') ? 0 : 1, rows: sql.startsWith('SELECT avatar_path') ? [{ avatar_path: avatarPath }] : [] };
   }, release() {} }));
   return calls;
 }
@@ -107,7 +137,7 @@ test('completed or disconnected responses start no storage or database work and 
   const calls = storageFixture(), database = databaseFixture();
   const photo = await image();
   for (const flag of ['headersSent', 'writableEnded', 'destroyed'] as const) {
-    for (const handler of [getProfilePhoto, putProfilePhoto]) {
+    for (const handler of [getProfilePhoto, putProfilePhoto, deleteProfilePhoto]) {
       const { res, result, close } = response(); close(flag);
       await handler(request(photo), res);
       assert.equal(result.writes, 0); assert.equal(result.headerWrites, 0);
@@ -213,4 +243,119 @@ test('storage fetch aborts a stalled sign, upload and removal and preserves call
     requestController.abort(cancellation);
     await assert.rejects(inherited, error => error === cancellation);
   } finally { clearTimeout(keepAlive); }
+});
+
+test('photo removal locks the caller profile, ignores supplied paths and deletes only its committed stored object', async () => {
+  const database = databaseFixture();
+  const storage = storageFixture(false, call => {
+    if (call.method === 'DELETE') assert.ok(database.some(query => query.sql === 'COMMIT'), 'storage cleanup follows acknowledged commit');
+  });
+  const foreignPath = '00000000-0000-4000-8000-000000000299/00000000-0000-4000-8000-000000000298.webp';
+  const req = request(undefined, foreignPath);
+  req.body = { path: foreignPath, avatar_path: foreignPath, userId: '00000000-0000-4000-8000-000000000299' };
+  const { result, res } = response();
+  await deleteProfilePhoto(req, res);
+  assert.equal(result.status, 200); assert.deepEqual(result.body, { data: { url: null } });
+  assert.deepEqual(database.find(call => call.sql.startsWith('SELECT avatar_path'))?.values, [userId]);
+  assert.match(database.find(call => call.sql.startsWith('SELECT avatar_path'))!.sql, /FOR UPDATE/);
+  assert.deepEqual(database.find(call => call.sql.startsWith('UPDATE profiles'))?.values, [userId]);
+  assert.deepEqual(database.find(call => call.sql.includes('profile.photo_removed'))?.values, [userId]);
+  assert.deepEqual(storage.map(call => ({ method: call.method, body: call.body })), [{ method: 'DELETE', body: { prefixes: [oldPath] } }]);
+});
+
+test('removing a foreign or malformed stored path clears only the caller profile without touching another object', async () => {
+  const foreignPath = '00000000-0000-4000-8000-000000000299/00000000-0000-4000-8000-000000000298.webp';
+  for (const path of [foreignPath, `${userId}/../another-account.webp`]) {
+    const storage = storageFixture(); const database = databaseFixture(undefined, { avatarPath: path });
+    const { result, res } = response(); await deleteProfilePhoto(request(), res);
+    assert.equal(result.status, 200);
+    assert.ok(database.some(call => call.sql.startsWith('UPDATE profiles SET avatar_path=NULL')));
+    assert.ok(database.some(call => call.sql.includes('profile.photo_removed')));
+    assert.equal(storage.length, 0);
+    mock.restoreAll();
+  }
+});
+
+test('empty photo removal is idempotent and a successful retry creates no duplicate update, audit or cleanup', async () => {
+  const storage = storageFixture(), database = databaseFixture();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { result, res } = response(); await deleteProfilePhoto(request(), res);
+    assert.equal(result.status, 200); assert.deepEqual(result.body, { data: { url: null } });
+  }
+  assert.equal(database.filter(call => call.sql.startsWith('UPDATE profiles')).length, 1);
+  assert.equal(database.filter(call => call.sql.includes('profile.photo_removed')).length, 1);
+  assert.equal(database.filter(call => call.sql === 'COMMIT').length, 2);
+  assert.equal(storage.length, 1);
+});
+
+test('photo removal rollback and uncertain COMMIT retain the stored object', async () => {
+  for (const fixture of [
+    { failAt: 'UPDATE' as const }, { failAt: 'AUDIT' as const },
+    { failAt: 'COMMIT' as const }, { failAt: 'COMMIT' as const, commitBeforeFailure: true },
+  ]) {
+    const storage = storageFixture(), database = databaseFixture(fixture.failAt, fixture);
+    const { result, res } = response(); await deleteProfilePhoto(request(), res);
+    assert.equal(result.status, 503);
+    assert.ok(database.some(call => call.sql === 'ROLLBACK'));
+    assert.equal(storage.length, 0, 'a rollback or lost commit acknowledgement never authorizes object deletion');
+    mock.restoreAll();
+  }
+});
+
+test('a missing profile cannot create a removal audit or storage operation', async () => {
+  const storage = storageFixture(), database = databaseFixture(undefined, { exists: false });
+  const { result, res } = response(); await deleteProfilePhoto(request(), res);
+  assert.equal(result.status, 503);
+  assert.equal(database.some(call => call.sql.startsWith('UPDATE') || call.sql.startsWith('INSERT')), false);
+  assert.equal(storage.length, 0);
+});
+
+test('removal does not start a new profile mutation if its response ends while waiting for the row lock', async () => {
+  const entered = deferred(), release = deferred();
+  const storage = storageFixture(), database = databaseFixture(undefined, { beforeQuery: async sql => {
+    if (sql.startsWith('SELECT avatar_path')) { entered.resolve(); await release.promise; }
+  } });
+  const { result, res, close } = response(); const work = deleteProfilePhoto(request(), res);
+  await entered.promise; close(); release.resolve(); await work;
+  assert.equal(result.writes, 0);
+  assert.equal(database.some(call => call.sql.startsWith('UPDATE') || call.sql.startsWith('INSERT')), false);
+  assert.ok(database.some(call => call.sql === 'ROLLBACK'));
+  assert.equal(storage.length, 0);
+});
+
+test('a removal committed before its cleanup timeout never writes a second response', async () => {
+  const entered = deferred(), release = deferred();
+  const storage = storageFixture(false, async call => { if (call.method === 'DELETE') { entered.resolve(); await release.promise; } });
+  const database = databaseFixture(); const { result, res, close } = response();
+  const work = deleteProfilePhoto(request(), res);
+  await entered.promise; assert.ok(database.some(call => call.sql === 'COMMIT'));
+  close('destroyed'); release.resolve(); await work;
+  assert.equal(result.writes, 0);
+  assert.equal(database.filter(call => call.sql.includes('profile.photo_removed')).length, 1);
+  assert.deepEqual(storage.map(call => call.body), [{ prefixes: [oldPath] }]);
+});
+
+test('failed cleanup does not undo an acknowledged photo removal', async () => {
+  storageFixture(false, call => { if (call.method === 'DELETE') throw new Error('Fixture storage outage'); });
+  const database = databaseFixture(); const { result, res } = response();
+  await deleteProfilePhoto(request(), res);
+  assert.equal(result.status, 200); assert.deepEqual(result.body, { data: { url: null } });
+  assert.ok(database.some(call => call.sql === 'COMMIT'));
+  assert.equal(database.some(call => call.sql === 'ROLLBACK'), false);
+});
+
+test('the removal route is guarded by authentication and session OTP before accessing photos', async () => {
+  const middleware = photoRouter.stack.filter(layer => !layer.route).map(layer => layer.handle);
+  assert.equal(middleware[0], requireAuth); assert.equal(middleware[1], requireOtp);
+  const route = photoRouter.stack.find(layer => layer.route?.path === '/photo' && layer.route.methods.delete)?.route;
+  assert.ok(route); assert.equal(route.stack.at(-1)!.handle, deleteProfilePhoto);
+  const storage = storageFixture(), database = databaseFixture();
+  const anonymous = request(); delete anonymous.auth;
+  let nextCalls = 0;
+  const unsigned = response(); await middleware[0](anonymous, unsigned.res, () => { nextCalls++; });
+  assert.equal(unsigned.result.status, 401);
+  mock.method(pool, 'query', async () => ({ rows: [], rowCount: 0 }));
+  const unverified = response(); await middleware[1](request(), unverified.res, () => { nextCalls++; });
+  assert.equal(unverified.result.status, 428);
+  assert.equal(nextCalls, 0); assert.equal(database.length, 0); assert.equal(storage.length, 0);
 });

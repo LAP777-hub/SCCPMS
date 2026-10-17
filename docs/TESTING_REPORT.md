@@ -1,6 +1,6 @@
 # SCCPMS testing report
 
-**Report date:** 16 October 2026 (Africa/Johannesburg)
+**Report date:** 17 October 2026 (Africa/Johannesburg)
 **Application under review:** the root React/Vite application in `src/` and the Express API in `server/`.
 **Status:** the admin overview release is published at application commit `c4a20ca`, and both Vercel projects were verified READY for that exact commit. Its [cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/runs/38955867246) passed **399 server checks with seven intentional unit-command database skips**, **seven separate real PostgreSQL cases**, **121 browser cases**, builds, typechecks and security checks. **9/9 deployed HTTP checks** and **7/7 live overview/asset/protection checks** passed. Earlier **10/10 live address searches**, **8/8 live desktop/mobile email-wrapper checks** and two delivered Brevo API/Supabase SMTP setup messages remain separate evidence. Migrations 027/028 remain applied; login OTP lifetime is five minutes. Sections 11h–11l preserve release history, failed attempts, corrections and remaining real-user acceptance work.
 
@@ -1305,6 +1305,36 @@ and [successful cloud workflow](https://github.com/LAP777-hub/SCCPMS/actions/run
 This final evidence update changes documentation only. Authenticated live-user
 workflow acceptance remains distinct from fixture browser tests and the
 read-only production aggregate check.
+
+## 11m. Centred popups and five-megabyte profile images — 17 October 2026
+
+The user requested every popup in the centre of the viewport, a 5 MB image limit
+and four photo operations: select, upload, remove and view larger. The enlarged
+view toggles back to the smaller preview within the same popup. Closing the
+dialog is a separate standard dismissal control.
+
+| Check or finding | Recorded result |
+| --- | --- |
+| Root cause of top-left dialogs | Tailwind's universal margin reset overrode the browser dialog's default centring. The shared dialog now explicitly uses fixed positioning, `inset: 0`, auto margins, fit-content height and viewport-bounded scrolling |
+| Other popup review | Staff invitation overlays and invited-staff password dialogs already had explicit viewport centring; their actual desktop/mobile geometry is included in regression coverage |
+| Source image allowance | UI, server raw-image limit, exact photo-route request guard and private Storage bucket now use **5,242,880 bytes**; normal JSON limits remain 256 KiB |
+| Hosted upload compatibility | The browser validates the 5 MB source and original 16 MP dimensions, then optimises the image before upload with a 4 MiB transport cap; server pixel decoding/re-encoding and metadata stripping remain mandatory. Decode/encode failures never upload the original unoptimised file |
+| Four photo actions | Select previews a pending image, Upload saves it, Remove clears a pending selection or deletes the saved photo, and View larger expands the preview inside the centred popup |
+| Saved-photo removal | Own-user row lock, transactional path clearing and audit, database-derived object path, post-commit owned-object cleanup, idempotent empty retries and preservation on uncertain commit |
+| Focused photo backend checks | **25/25 passed**, no skips/failures/cancellations, 3.369s; includes a real valid ~4.2 MB PNG accepted/re-encoded, real over 5 MB input rejected, deletion ownership, rollback, lost commit, repeated removal and timeout handling |
+| Focused size/HTTP guards | **4/4 passed**, no skips/failures/cancellations, 15.637s; exactly 5 MiB accepted, next byte rejected, other routes retain 256 KiB and unauthenticated DELETE returns 401 |
+| Initial focused browser checks | **14/14 passed**, 31.0s; all-role upload/delete persistence across reload, five-megabyte inclusive boundary, invalid selection preservation, larger view/reopen state, and actual centred geometry over scrolled photo/Records/staff pages and password setup at desktop/mobile sizes |
+| Image preparation failure regression | Added a browser case where encoding returns no image: no original-file fallback request, visible actionable error, selected image retained and controls become available again |
+| Live private bucket setting | Updated/read back at 05:03 SAST: private, 5,242,880-byte limit, allowed type only normalised WebP; zero real profiles changed and zero files uploaded by the settings check |
+| Builds and static checks | Frontend/backend TypeScript and backend build pass; ESLint zero errors with the existing Fast Refresh warning and `.eslintignore` notice. Frontend fixture build 1.75s, 502.56kB entry/135.15kB gzip; standard 500kB advisory retained |
+| Complete local backend regression | **419 total: 412 passed, seven intentional opt-in database skips, zero failures or cancellations**, 99.377s |
+| Complete local browser regression | **132/132 passed**, 2.9 minutes; includes all new photo/popup cases and the encoder-failure recovery case, plus prior role, OTP, registration, overview, Records, reports and session workflows |
+| Publication scan | **521 indexed files, zero findings**; private configuration, provider responses and diagnostic artifacts remain ignored |
+
+No live profile image or account was changed by the automated photo tests. Real
+pixels are decoded in the browser/server fixtures; provider and profile writes
+are isolated mocks. Full regression and hosted release results follow after
+their commands complete.
 
 ## 12. Supporting documents
 

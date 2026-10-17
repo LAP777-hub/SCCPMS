@@ -7,7 +7,7 @@ import { pool } from './db.js';
 import { requireAuth, requireOtp } from './auth.js';
 
 export const PHOTO_BUCKET = 'profile-photos';
-export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const formats = { 'image/jpeg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp' } as const;
 export function boundedPhotoStorageFetch(input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1], timeoutMs = 10000) {
   const previousSignal = init?.signal ?? (input instanceof globalThis.Request ? input.signal : undefined);
@@ -51,7 +51,7 @@ export async function putProfilePhoto(req: Request, res: Response) {
   res.set('Cache-Control', 'private, no-store');
   let image: Buffer;
   try { image = await prepareProfilePhoto(req.body, req.get('content-type')?.split(';')[0].trim().toLowerCase() ?? ''); }
-  catch { return photoResponse(res, 422, { error: 'Choose a valid JPEG, PNG or WebP photo up to 2 MB (maximum 16 megapixels).' }); }
+  catch { return photoResponse(res, 422, { error: 'Choose a valid JPEG, PNG or WebP photo up to 5 MB (maximum 16 megapixels).' }); }
   if (responseEnded(res)) return res;
   const userId = req.auth!.userId;
   const path = `${userId}/${randomUUID()}.webp`;
@@ -83,8 +83,41 @@ export async function putProfilePhoto(req: Request, res: Response) {
   try { return photoResponse(res, 200, { data: await photoData(userId, path) }); }
   catch { return photoResponse(res, 200, { data: { url: null }, message: 'Photo saved. Reload your profile to view it.' }); }
 }
+export async function deleteProfilePhoto(req: Request, res: Response) {
+  if (responseEnded(res)) return res;
+  res.set('Cache-Control', 'private, no-store');
+  const userId = req.auth!.userId;
+  let previous: unknown;
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query('BEGIN');
+    // A cached profile or request body may name an old/foreign object. Only the
+    // locked caller-owned database row determines what can be removed.
+    const existing = await client.query('SELECT avatar_path FROM profiles WHERE id=$1 FOR UPDATE', [userId]);
+    if (!existing.rowCount) throw new Error('Profile unavailable.');
+    previous = existing.rows[0].avatar_path;
+    if (responseEnded(res)) {
+      await client.query('ROLLBACK');
+      return res;
+    }
+    if (previous !== null && previous !== undefined) {
+      await client.query('UPDATE profiles SET avatar_path=NULL,updated_at=now() WHERE id=$1', [userId]);
+      await client.query("INSERT INTO audit_events(actor_user_id,action,entity_type,entity_id) VALUES($1,'profile.photo_removed','profile',$1)", [userId]);
+    }
+    await client.query('COMMIT');
+  } catch {
+    await client?.query('ROLLBACK').catch(() => undefined);
+    // Never delete storage after an ambiguous COMMIT acknowledgement: the
+    // profile may still reference the object if its transaction rolled back.
+    return photoResponse(res, 503, { error: 'Unable to remove your profile photo. Refresh and retry shortly.' });
+  } finally { client?.release(); }
+  if (ownPath(userId, previous)) await admin.storage.from(PHOTO_BUCKET).remove([previous]).catch(() => undefined);
+  return photoResponse(res, 200, { data: { url: null } });
+}
 const router = Router();
 router.use(requireAuth, requireOtp);
 router.get('/photo', getProfilePhoto);
 router.put('/photo', express.raw({ type: Object.keys(formats), limit: MAX_PHOTO_BYTES }), putProfilePhoto);
+router.delete('/photo', deleteProfilePhoto);
 export default router;

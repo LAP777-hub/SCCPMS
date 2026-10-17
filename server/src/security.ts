@@ -47,7 +47,7 @@ export function sanitizeRequest(req: Request, res: Response, next: NextFunction)
 export function validateRequestSize(req: Request, res: Response, next: NextFunction) {
   const contentLength = parseInt(req.headers['content-length'] || '0', 10);
   const photoUpload = req.path === '/api/profile/photo' && req.method === 'PUT';
-  const maxSize = photoUpload ? 2 * 1024 * 1024 : 256 * 1024;
+  const maxSize = photoUpload ? 5 * 1024 * 1024 : 256 * 1024;
 
   if (contentLength > maxSize) {
     logger.warn('Request size exceeded', {

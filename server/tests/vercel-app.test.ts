@@ -21,7 +21,7 @@ test('the Vercel entry exports Express without binding a local port and retains 
   try {
     assert.deepEqual(await fetch(origin).then(response => response.json()), { service: 'SCCPMS API', health: '/healthz' });
     assert.equal((await fetch(`${origin}/healthz`)).status, 200);
-    for (const [method, path] of [['GET', '/auth/profile'], ['POST', '/auth/otp/send'], ['GET', '/api/patients'], ['GET', '/api/profile/photo'], ['PUT', '/api/profile/photo']]) {
+    for (const [method, path] of [['GET', '/auth/profile'], ['POST', '/auth/otp/send'], ['GET', '/api/patients'], ['GET', '/api/profile/photo'], ['PUT', '/api/profile/photo'], ['DELETE', '/api/profile/photo']]) {
       const response = await fetch(`${origin}${path}`, { method, headers: { Origin: config.FRONTEND_ORIGIN } });
       assert.equal(response.status, 401);
       assert.equal(response.headers.get('access-control-allow-origin'), config.FRONTEND_ORIGIN);

@@ -2,6 +2,16 @@
 .profile-photo-button:focus-visible { outline: 3px solid #ffb521; outline-offset: 3px; }
 .profile-photo-button img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .profile-photo-editor { display: grid; gap: 16px; color: #dbe4ee; }
-.profile-photo-editor label { display: grid; gap: 8px; }
-.profile-photo-editor input { max-width: 100%; }
+.profile-photo-editor > p { margin: 0; text-align: center; font-size: 14px; }
 .profile-photo-editor .profile-photo-preview { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; }
+.profile-photo-stage { display: flex; justify-content: center; align-items: center; min-height: 160px; color: #8795a7; }
+.profile-photo-editor .profile-photo-preview-large { width: min(100%,512px); height: auto; max-height: min(55dvh,512px); border-radius: 10px; object-fit: contain; }
+.profile-photo-selection { color: #c6d2e0; overflow-wrap: anywhere; }
+.profile-photo-file-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; opacity: 0; overflow: hidden; clip: rect(0,0,0,0); }
+.profile-photo-actions { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.profile-photo-actions button { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 10px 12px; color: #e7edf5; border: 1px solid #435267; border-radius: 9px; background: #142235; font-size: 14px; }
+.profile-photo-actions button.primary { background: #c61b31; border-color: #ed3b4e; }
+.profile-photo-actions button.danger { color: #ffabb2; border-color: #8f3944; background: #48202c66; }
+.profile-photo-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.profile-photo-actions button:not(:disabled):hover { filter: brightness(1.2); }
+@media(max-width:600px) { .profile-photo-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }.profile-photo-stage { min-height: 140px; }.profile-photo-editor .profile-photo-preview-large { max-height: 45dvh; }.profile-photo-editor > p { font-size: 13px; } }
